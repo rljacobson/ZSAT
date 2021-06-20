@@ -1,0 +1,19 @@
+[package]
+name        = "zsat"
+description = "RIIR for the z3 SAT solver."
+version     = "0.1.0"
+authors     = ["Robert Jacobson <rljacobson@gmail.com>"]
+edition     = "2018"
+
+publish = false  # Don't accidentally publish this.
+
+[dependencies]
+num-traits = "0.2"   # Used as `ApproximateSet` trait.
+bit-set    = "0.5"   # As `uint_set`
+thiserror  = "1.0"   # `#[derive(Error)]`
+user-error = "1.2"   # Pretty printing error
+symbol-map = "1.0" # Symbol Table
+
+[features]
+default = ["single_threaded"]
+single_threaded = []
