@@ -19,6 +19,7 @@ use num_traits::{PrimInt, Unsigned};
 
 use super::ApproximateSet;
 
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
 pub struct OredIntegerSet<IndexType, MemberType>
   where IndexType: PrimInt + Unsigned,
         MemberType: Into<IndexType>
@@ -42,7 +43,7 @@ impl<ValueType, MemberType> ApproximateSet<MemberType> for OredIntegerSet<ValueT
     set
   }
 
-  fn with_values(values: Vec<MemberType>) -> Self {
+  fn with_values(values: &[MemberType]) -> Self {
     let mut set = Self::new();
     for i in values {
       set.insert(i);

@@ -1,8 +1,8 @@
 /*!
-  
+
   A `Model` maps `BoolVariable`s to their respective truth values. A `Model` is really just a
   wrapper for a vector of `LiftedBool`s indexed by `BoolVariable`s (`u32`s).
-  
+
 */
 
 use crate::{
@@ -12,6 +12,8 @@ use crate::{
 };
 use std::fmt::{Formatter, Display};
 use std::ops::{Index, Not};
+use std::borrow::Borrow;
+use itertools::Itertools;
 
 pub struct Model {
   assignments: Vec<LiftedBool>
@@ -40,7 +42,7 @@ impl Index<BoolVariable> for Model{
   type Output = LiftedBool;
 
   fn index(&self, index: BoolVariable) -> &Self::Output {
-    self.assignments[index]
+    self.assignments.get(index).unwrap()
   }
 }
 
@@ -55,6 +57,18 @@ impl Index<Literal> for Model{
       &val.not()
     }
   }
+}
+
+impl Model {
+
+  pub fn clear(&mut self){
+    self.assignments.clear()
+  }
+
+  pub fn push(&mut self, value: LiftedBool) {
+    self.assignments.push(value);
+  }
+
 }
 
 pub fn value_of_bool_variable(var: BoolVariable, model: &Model) -> LiftedBool {

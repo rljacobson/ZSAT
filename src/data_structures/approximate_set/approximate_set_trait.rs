@@ -6,7 +6,9 @@ probabilistically. The `ApproximateSet` holds values of type `T`.
 pub trait ApproximateSet<T> {
   fn new() -> Self;
   fn with_value(value: &T) -> Self;
-  fn with_values(values: Vec<T>) -> Self;
+
+  fn with_values(values: &[T]) -> Self;
+
   fn insert(&mut self, value: &T);
   fn may_contain(&self, value: &T) -> bool;
   fn must_not_contain(&self, value: &T) -> bool {

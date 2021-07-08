@@ -1,14 +1,18 @@
 /*!
-  
+
   Parameters governing how the solver functions.
-  
+
 */
 
 use std::rc::Rc;
 
-use crate::symbol_table::Symbol;
-use crate::missing_types::{Parameters, ParameterDescriptions};
-use crate::local_search::LocalSearchMode;
+use crate::{
+  symbol_table::Symbol,
+  missing_types::{Parameters, ParameterDescriptions}
+};
+
+use super::local_search::LocalSearchMode;
+use crate::parameters::ParametersRef;
 
 // region Enums used in `Config`
 
@@ -79,40 +83,41 @@ pub enum CutoffType {
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash)]
 pub struct Config<'s> {
-  max_memory            : u64,
-  phase                 : PhaseSelection,
-  search_sat_conflicts  : u32,
-  search_unsat_conflicts: u32,
-  pub(in local_search) phase_sticky: bool,
-  rephase_base          : u32,
-  reorder_base          : u32,
-  reorder_itau          : f64,
-  reorder_activity_scale: u32,
-  propagate_prefetch    : bool,
-  restart               : RestartStrategy,
-  restart_fast          : bool,
-  restart_initial       : u32,
-  restart_factor        : f64,             // for geometric case
-  restart_margin        : f64,             // for EMA
-  restart_max           : u32,
-  activity_scale        : u32,
-  fast_glue_avg         : f64,
-  slow_glue_avg         : f64,
-  inprocess_max         : u32,
-  inprocess_out         : Symbol<'s>,
-  random_freq           : f64,
-  pub(in local_search) random_seed: u32,
-  burst_search        : u32,
-  enable_pre_simplify : bool,
-  max_conflicts       : u32,
-  num_threads         : u32,
-  ddfw_search         : bool,
-  ddfw_threads        : u32,
-  prob_search         : bool,
-  local_search_threads: u32,
-  local_search        : bool,
-  pub(in local_search) local_search_mode     : LocalSearchMode,
-  pub(in local_search) local_search_dbg_flips: bool,
+  max_memory                : u64,
+  phase                     : PhaseSelection,
+  search_sat_conflicts      : u32,
+  search_unsat_conflicts    : u32,
+  pub phase_sticky          : bool,
+  rephase_base              : u32,
+  reorder_base              : u32,
+  reorder_itau              : f64,
+  reorder_activity_scale    : u32,
+  propagate_prefetch        : bool,
+  restart                   : RestartStrategy,
+  restart_fast              : bool,
+  restart_initial           : u32,
+  restart_factor            : f64,             // for geometric case
+  restart_margin            : f64,             // for EMA
+  restart_max               : u32,
+  activity_scale            : u32,
+  fast_glue_avg             : f64,
+  slow_glue_avg             : f64,
+  inprocess_max             : u32,
+  inprocess_out             : Symbol<'s>,
+  random_freq               : f64,
+  pub random_seed           : u32,
+  burst_search              : u32,
+  enable_pre_simplify       : bool,
+  max_conflicts             : u32,
+  num_threads               : u32,
+  ddfw_search               : bool,
+  ddfw_threads              : u32,
+  prob_search               : bool,
+  local_search_threads      : u32,
+  local_search              : bool,
+  pub local_search_mode     : LocalSearchMode,
+  pub local_search_dbg_flips: bool,
+
   binspr          : bool,
   cut_simplify    : bool,
   cut_delay       : u32,
@@ -147,7 +152,6 @@ pub struct Config<'s> {
   simplify_mult2: f64,
   simplify_max  : u32,
   simplify_delay: u32,
-
   variable_decay: u32,
 
   gc_strategy   : GcStrategy,
@@ -157,13 +161,11 @@ pub struct Config<'s> {
   gc_k          : u32,
   gc_burst      : bool,
   gc_defrag     : bool,
-
   force_cleanup : bool,
 
   // backtracking
   backtrack_scopes        : u32,
   backtrack_init_conflicts: u32,
-
   minimize_lemmas         : bool,
   dyn_sub_res             : bool,
   core_minimize           : bool,
@@ -176,7 +178,6 @@ pub struct Config<'s> {
   drat_check_unsat: bool,
   drat_check_sat  : bool,
   drat_activity   : bool,
-
   card_solver     : bool,
   xor_solver      : bool,
   pb_resolve      : PbResolve,     // Pseudo-boolean Resolve
@@ -191,18 +192,18 @@ pub struct Config<'s> {
   reward_multiplier  : f64,
   reward_offset      : f64,
 
-  // simplifier configurations used outside of `SatSimplifier`
+  // Simplifier configurations used outside of `SatSimplifier`
   elim_vars: bool,
 
 }
 
-impl Config{
+impl<'s> Config<'s>{
 
-  pub fn new(parameters: Rc<Parameters>){
-    unimplemented!();
+  pub fn new(parameters: ParametersRef){
+
   }
 
-  pub fn update_parameters(parameters: Rc<Parameters>){
+  pub fn update_parameters(parameters: ParametersRef){
     unimplemented!();
   }
 

@@ -1,5 +1,5 @@
+
 mod solver;
-mod approximate_set;
 mod literal;
 mod lifted_bool;
 mod errors;
@@ -11,19 +11,19 @@ mod local_search;
 mod check_satisfiability;
 mod missing_types;  // todo: delete this.
 mod config;
-mod statistics;
-mod logging;
+mod log;
+mod data_structures;
+mod watched;
+mod clause;
+mod parameters;
+mod parallel;
 
 
-use std::fmt::{Display, Formatter};
-use std::ops::Not;
-
-
-// Re-exports
-
-pub use literal::{Literal, LiteralVector};
-pub use lifted_bool::LiftedBool;
+// Re-exported items
+pub use data_structures::{OredIntegerSet, Statistic, Statistics};
 pub use errors::Error;
+pub use lifted_bool::LiftedBool;
+pub use literal::{Literal, LiteralVector};
 pub use model::Model;
 pub use resource_limit::{
   ResourceLimit,
@@ -34,23 +34,27 @@ pub use solver::Solver;
 
 
 
-// Type defs
+/// This library tries to track a specific version of z3 and reports this version, e.g., on some fatal errors in
+/// debug mode.
+const Z3_FULL_VERSION: &str = "1.2.3";
 
 // todo: Should any of these be a newtype?
-pub type BoolVariable       = u32;  // todo: Seems like this should be a usize, as it's used as an index.
-pub type BoolVariableVector = Vec<BoolVariable>;
-pub type VarApproximateSet  = approximate_set::OredIntegerSet<u64, BoolVariable>;
-pub const NULL_BOOL_VAR: BoolVariable = u32::MAX >> 1;
+// todo: Seems like `BoolVariable` should be a `usize`, as it's used as an index. It might be a `u32` for the sake of
+//       spacial economy.
 
-pub type ClauseOffset               = usize;
-pub type ExternalConstraintIndex    = usize;
-pub type ExternalJustificationIndex = usize;
-pub type Theory                     = i32; // todo: Why not u32?
+/// A bool variable $x_j$ has corresponding literals $x_j$ and $\overline{x}_j$. We represent
+/// $x_j$ by $j$ and $\overline{x}_j$ by $\overline{j}$.
+pub type BoolVariable                 = usize;                               // u32;
+pub const NULL_BOOL_VAR: BoolVariable = BoolVariable::MAX >> 1;
+pub type BoolVariableVector           = Vec<BoolVariable>;
+pub type VariableApproximateSet       = OredIntegerSet<usize, BoolVariable>;
+pub type ExtensionConstraintIndex     = usize;
+pub type ExternalJustificationIndex   = usize;
+pub type Theory                       = i32;                                 // todo: Why not u32?
+pub type UIntSet                      = bit_set::BitSet;
 
-pub type UIntSet = bit_set::BitSet;
 
-// Newtypes
-
+/*
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug, Hash)]
 pub struct DimacsLiteral(Literal);
 
@@ -59,11 +63,7 @@ impl Display for DimacsLiteral {
     unimplemented!()
   }
 }
-
-
-
-
-
+*/
 
 #[cfg(test)]
 mod tests {

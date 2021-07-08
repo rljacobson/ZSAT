@@ -1,0 +1,590 @@
+{
+  "module"     : "sat",
+  "export"     : true,
+  "description": "propositional SAT solver",
+  "params"     : [
+    {
+      "param"      : "max_memory",
+      "type"       : "UINT",
+      "default"    : 4294967295,
+      "description": "maximum amount of memory in megabytes"
+    },
+    {
+      "param"      : "phase",
+      "type"       : "SYMBOL",
+      "default"    : "caching",
+      "description": "phase selection strategy: always_false, always_true, basic_caching, random, caching"
+    },
+    {
+      "param"      : "phase.sticky",
+      "type"       : "BOOL",
+      "default"    : true,
+      "description": "use sticky phase caching"
+    },
+    {
+      "param"      : "search.unsat.conflicts",
+      "type"       : "UINT",
+      "default"    : 400,
+      "description": "period for solving for unsat (in number of conflicts)"
+    },
+    {
+      "param"      : "search.sat.conflicts",
+      "type"       : "UINT",
+      "default"    : 400,
+      "description": "period for solving for sat (in number of conflicts)"
+    },
+    {
+      "param"      : "rephase.base",
+      "type"       : "UINT",
+      "default"    : 1000,
+      "description": "number of conflicts per rephase "
+    },
+    {
+      "param"      : "reorder.base",
+      "type"       : "UINT",
+      "default"    : 4294967295,
+      "description": "number of conflicts per random reorder "
+    },
+    {
+      "param"      : "reorder.itau",
+      "type"       : "DOUBLE",
+      "default"    : 4.0,
+      "description": "inverse temperature for softmax"
+    },
+    {
+      "param"      : "reorder.activity_scale",
+      "type"       : "UINT",
+      "default"    : 100,
+      "description": "scaling factor for activity update"
+    },
+    {
+      "param"      : "propagate.prefetch",
+      "type"       : "BOOL",
+      "default"    : true,
+      "description": "prefetch watch lists for assigned literals"
+    },
+    {
+      "param"      : "restart",
+      "type"       : "SYMBOL",
+      "default"    : "ema",
+      "description": "restart strategy: static, luby, ema or geometric"
+    },
+    {
+      "param"      : "restart.initial",
+      "type"       : "UINT",
+      "default"    : 2,
+      "description": "initial restart (number of conflicts)"
+    },
+    {
+      "param"      : "restart.max",
+      "type"       : "UINT",
+      "default"    : 4294967295,
+      "description": "maximal number of restarts."
+    },
+    {
+      "param"      : "restart.fast",
+      "type"       : "BOOL",
+      "default"    : true,
+      "description": "use fast restart approach only removing less active literals."
+    },
+    {
+      "param"      : "restart.factor",
+      "type"       : "DOUBLE",
+      "default"    : 1.5,
+      "description": "restart increment factor for geometric strategy"
+    },
+    {
+      "param"      : "restart.margin",
+      "type"       : "DOUBLE",
+      "default"    : 1.1,
+      "description": "margin between fast and slow restart factors. For ema"
+    },
+    {
+      "param"      : "restart.emafastglue",
+      "type"       : "DOUBLE",
+      "default"    : 3e-2,
+      "description": "ema alpha factor for fast moving average"
+    },
+    {
+      "param"      : "restart.emaslowglue",
+      "type"       : "DOUBLE",
+      "default"    : 1e-5,
+      "description": "ema alpha factor for slow moving average"
+    },
+    {
+      "param"      : "variable_decay",
+      "type"       : "UINT",
+      "default"    : 110,
+      "description": "multiplier (divided by 100) for the VSIDS activity increment"
+    },
+    {
+      "param"      : "inprocess.max",
+      "type"       : "UINT",
+      "default"    : 4294967295,
+      "description": "maximal number of inprocessing passes"
+    },
+    {
+      "param"      : "inprocess.out",
+      "type"       : "SYMBOL",
+      "default"    : "",
+      "description": "file to dump result of the first inprocessing step and exit"
+    },
+    {
+      "param"      : "branching.heuristic",
+      "type"       : "SYMBOL",
+      "default"    : "vsids",
+      "description": "branching heuristic vsids, chb"
+    },
+    {
+      "param"      : "branching.anti_exploration",
+      "type"       : "BOOL",
+      "default"    : false,
+      "description": "apply anti-exploration heuristic for branch selection"
+    },
+    {
+      "param"      : "random_freq",
+      "type"       : "DOUBLE",
+      "default"    : 0.01,
+      "description": "frequency of random case splits"
+    },
+    {
+      "param"      : "random_seed",
+      "type"       : "UINT",
+      "default"    : 0,
+      "description": "random seed"
+    },
+    {
+      "param"      : "burst_search",
+      "type"       : "UINT",
+      "default"    : 100,
+      "description": "number of conflicts before first global simplification"
+    },
+    {
+      "param"      : "enable_pre_simplify",
+      "type"       : "BOOL",
+      "default"    : false,
+      "description": "enable pre simplifications before the bounded search"
+    },
+    {
+      "param"      : "max_conflicts",
+      "type"       : "UINT",
+      "default"    : 4294967295,
+      "description": "maximum number of conflicts"
+    },
+    {
+      "param"      : "gc",
+      "type"       : "SYMBOL",
+      "default"    : "glue_psm",
+      "description": "garbage collection strategy: psm, glue, glue_psm, dyn_psm"
+    },
+    {
+      "param"      : "gc.initial",
+      "type"       : "UINT",
+      "default"    : 20000,
+      "description": "learned clauses garbage collection frequency"
+    },
+    {
+      "param"      : "gc.increment",
+      "type"       : "UINT",
+      "default"    : 500,
+      "description": "increment to the garbage collection threshold"
+    },
+    {
+      "param"      : "gc.small_lbd",
+      "type"       : "UINT",
+      "default"    : 3,
+      "description": "learned clauses with small LBD are never deleted (only used in dyn_psm)"
+    },
+    {
+      "param"      : "gc.k",
+      "type"       : "UINT",
+      "default"    : 7,
+      "description": "learned clauses that are inactive for k gc rounds are permanently deleted (only used in dyn_psm)"
+    },
+    {
+      "param"      : "gc.burst",
+      "type"       : "BOOL",
+      "default"    : false,
+      "description": "perform eager garbage collection during initialization"
+    },
+    {
+      "param"      : "gc.defrag",
+      "type"       : "BOOL",
+      "default"    : true,
+      "description": "defragment clauses when garbage collecting"
+    },
+    {
+      "param"      : "simplify.delay",
+      "type"       : "UINT",
+      "default"    : 0,
+      "description": "set initial delay of simplification by a conflict count"
+    },
+    {
+      "param"      : "force_cleanup",
+      "type"       : "BOOL",
+      "default"    : false,
+      "description": "force cleanup to remove tautologies and simplify clauses"
+    },
+    {
+      "param"      : "minimize_lemmas",
+      "type"       : "BOOL",
+      "default"    : true,
+      "description": "minimize learned clauses"
+    },
+    {
+      "param"      : "dyn_sub_res",
+      "type"       : "BOOL",
+      "default"    : true,
+      "description": "dynamic subsumption resolution for minimizing learned clauses"
+    },
+    {
+      "param"      : "core.minimize",
+      "type"       : "BOOL",
+      "default"    : false,
+      "description": "minimize computed core"
+    },
+    {
+      "param"      : "core.minimize_partial",
+      "type"       : "BOOL",
+      "default"    : false,
+      "description": "apply partial (cheap) core minimization"
+    },
+    {
+      "param"      : "backtrack.scopes",
+      "type"       : "UINT",
+      "default"    : 100,
+      "description": "number of scopes to enable chronological backtracking"
+    },
+    {
+      "param"      : "backtrack.conflicts",
+      "type"       : "UINT",
+      "default"    : 4000,
+      "description": "number of conflicts before enabling chronological backtracking"
+    },
+    {
+      "param"      : "threads",
+      "type"       : "UINT",
+      "default"    : 1,
+      "description": "number of parallel threads to use"
+    },
+    {
+      "param"      : "dimacs.core",
+      "type"       : "BOOL",
+      "default"    : false,
+      "description": "extract core from DIMACS benchmarks"
+    },
+    {
+      "param"      : "drat.file",
+      "type"       : "SYMBOL",
+      "default"    : "",
+      "description": "file to dump DRAT proofs"
+    },
+    {
+      "param"      : "drat.binary",
+      "type"       : "BOOL",
+      "default"    : false,
+      "description": "use Binary DRAT output format"
+    },
+    {
+      "param"      : "drat.check_unsat",
+      "type"       : "BOOL",
+      "default"    : false,
+      "description": "build up internal proof and check"
+    },
+    {
+      "param"      : "drat.check_sat",
+      "type"       : "BOOL",
+      "default"    : false,
+      "description": "build up internal trace, check satisfying model"
+    },
+    {
+      "param"      : "drat.activity",
+      "type"       : "BOOL",
+      "default"    : false,
+      "description": "dump variable activities"
+    },
+    {
+      "param"      : "cardinality.solver",
+      "type"       : "BOOL",
+      "default"    : true,
+      "description": "use cardinality solver"
+    },
+    {
+      "param"      : "pb.solver",
+      "type"       : "SYMBOL",
+      "default"    : "solver",
+      "description": "method for handling Pseudo-Boolean constraints: circuit (arithmetical circuit], sorting (sorting circuit], totalizer (use totalizer encoding], binary_merge, segmented, solver (use native solver)"
+    },
+    {
+      "param"      : "pb.min_arity",
+      "type"       : "UINT",
+      "default"    : 9,
+      "description": "minimal arity to compile pb/cardinality constraints to CNF"
+    },
+    {
+      "param"      : "cardinality.encoding",
+      "type"       : "SYMBOL",
+      "default"    : "grouped",
+      "description": "encoding used for at-most-k constraints: grouped, bimander, ordered, unate, circuit"
+    },
+    {
+      "param"      : "pb.resolve",
+      "type"       : "SYMBOL",
+      "default"    : "cardinality",
+      "description": "resolution strategy for boolean algebra solver: cardinality, rounding"
+    },
+    {
+      "param"      : "pb.lemma_format",
+      "type"       : "SYMBOL",
+      "default"    : "cardinality",
+      "description": "generate either cardinality or pb lemmas"
+    },
+    {
+      "param"      : "euf",
+      "type"       : "BOOL",
+      "default"    : false,
+      "description": "enable euf solver (this feature is preliminary and not ready for general consumption)"
+    },
+    {
+      "param"      : "ddfw_search",
+      "type"       : "BOOL",
+      "default"    : false,
+      "description": "use ddfw local search instead of CDCL"
+    },
+    {
+      "param"      : "ddfw.init_clause_weight",
+      "type"       : "UINT",
+      "default"    : 8,
+      "description": "initial clause weight for DDFW local search"
+    },
+    {
+      "param"      : "ddfw.use_reward_pct",
+      "type"       : "UINT",
+      "default"    : 15,
+      "description": "percentage to pick highest reward variable when it has reward 0"
+    },
+    {
+      "param"      : "ddfw.restart_base",
+      "type"       : "UINT",
+      "default"    : 100000,
+      "description": "number of flips used a starting point for hesitant restart backoff"
+    },
+    {
+      "param"      : "ddfw.reinit_base",
+      "type"       : "UINT",
+      "default"    : 10000,
+      "description": "increment basis for geometric backoff scheme of re-initialization of weights"
+    },
+    {
+      "param"      : "ddfw.threads",
+      "type"       : "UINT",
+      "default"    : 0,
+      "description": "number of ddfw threads to run in parallel with sat solver"
+    },
+    {
+      "param"      : "prob_search",
+      "type"       : "BOOL",
+      "default"    : false,
+      "description": "use probsat local search instead of CDCL"
+    },
+    {
+      "param"      : "local_search",
+      "type"       : "BOOL",
+      "default"    : false,
+      "description": "use local search instead of CDCL"
+    },
+    {
+      "param"      : "local_search_threads",
+      "type"       : "UINT",
+      "default"    : 0,
+      "description": "number of local search threads to find satisfiable solution"
+    },
+    {
+      "param"      : "local_search_mode",
+      "type"       : "SYMBOL",
+      "default"    : "wsat",
+      "description": "local search algorithm, either default wsat or qsat"
+    },
+    {
+      "param"      : "local_search_dbg_flips",
+      "type"       : "BOOL",
+      "default"    : false,
+      "description": "write debug information for number of flips"
+    },
+    {
+      "param"      : "binspr",
+      "type"       : "BOOL",
+      "default"    : false,
+      "description": "enable SPR inferences of binary propagation redundant clauses. This in-processing step eliminates models"
+    },
+    {
+      "param"      : "anf",
+      "type"       : "BOOL",
+      "default"    : false,
+      "description": "enable ANF based simplification in-processing"
+    },
+    {
+      "param"      : "anf.delay",
+      "type"       : "UINT",
+      "default"    : 2,
+      "description": "delay ANF simplification by in-processing round"
+    },
+    {
+      "param"      : "anf.exlin",
+      "type"       : "BOOL",
+      "default"    : false,
+      "description": "enable extended linear simplification"
+    },
+    {
+      "param"      : "cut",
+      "type"       : "BOOL",
+      "default"    : false,
+      "description": "enable AIG based simplification in-processing"
+    },
+    {
+      "param"      : "cut.delay",
+      "type"       : "UINT",
+      "default"    : 2,
+      "description": "delay cut simplification by in-processing round"
+    },
+    {
+      "param"      : "cut.aig",
+      "type"       : "BOOL",
+      "default"    : false,
+      "description": "extract aigs (and ites) from clauses for cut simplification"
+    },
+    {
+      "param"      : "cut.lut",
+      "type"       : "BOOL",
+      "default"    : false,
+      "description": "extract luts from clauses for cut simplification"
+    },
+    {
+      "param"      : "cut.xor",
+      "type"       : "BOOL",
+      "default"    : false,
+      "description": "extract xors from clauses for cut simplification"
+    },
+    {
+      "param"      : "cut.npn3",
+      "type"       : "BOOL",
+      "default"    : false,
+      "description": "extract 3 input functions from clauses for cut simplification"
+    },
+    {
+      "param"      : "cut.dont_cares",
+      "type"       : "BOOL",
+      "default"    : true,
+      "description": "integrate dont cares with cuts"
+    },
+    {
+      "param"      : "cut.redundancies",
+      "type"       : "BOOL",
+      "default"    : true,
+      "description": "integrate redundancy checking of cuts"
+    },
+    {
+      "param"      : "cut.force",
+      "type"       : "BOOL",
+      "default"    : false,
+      "description": "force redoing cut-enumeration until a fixed-point"
+    },
+    {
+      "param"      : "lookahead.cube.cutoff",
+      "type"       : "SYMBOL",
+      "default"    : "depth",
+      "description": "cutoff type used to create lookahead cubes: depth, freevars, psat, adaptive_freevars, adaptive_psat"
+    },
+    {
+      "param"      : "lookahead.cube.fraction",
+      "type"       : "DOUBLE",
+      "default"    : 0.4,
+      "description": "adaptive fraction to create lookahead cubes. Used when lookahead.cube.cutoff is adaptive_freevars or adaptive_psat"
+    },
+    {
+      "param"      : "lookahead.cube.depth",
+      "type"       : "UINT",
+      "default"    : 1,
+      "description": "cut-off depth to create cubes. Used when lookahead.cube.cutoff is depth."
+    },
+    {
+      "param"      : "lookahead.cube.freevars",
+      "type"       : "DOUBLE",
+      "default"    : 0.8,
+      "description": "cube free variable fraction. Used when lookahead.cube.cutoff is freevars"
+    },
+    {
+      "param"      : "lookahead.cube.psat.var_exp",
+      "type"       : "DOUBLE",
+      "default"    : 1,
+      "description": "free variable exponent for PSAT cutoff"
+    },
+    {
+      "param"      : "lookahead.cube.psat.clause_base",
+      "type"       : "DOUBLE",
+      "default"    : 2,
+      "description": "clause base for PSAT cutoff"
+    },
+    {
+      "param"      : "lookahead.cube.psat.trigger",
+      "type"       : "DOUBLE",
+      "default"    : 5,
+      "description": "trigger value to create lookahead cubes for PSAT cutoff. Used when lookahead.cube.cutoff is psat"
+    },
+    {
+      "param"      : "lookahead.preselect",
+      "type"       : "BOOL",
+      "default"    : false,
+      "description": "use pre-selection of subset of variables for branching"
+    },
+    {
+      "param"      : "lookahead_simplify",
+      "type"       : "BOOL",
+      "default"    : false,
+      "description": "use lookahead solver during simplification"
+    },
+    {
+      "param"      : "lookahead_scores",
+      "type"       : "BOOL",
+      "default"    : false,
+      "description": "extract lookahead scores. A utility that can only be used from the DIMACS front-end"
+    },
+    {
+      "param"      : "lookahead.double",
+      "type"       : "BOOL",
+      "default"    : true,
+      "description": "enable double lookahead"
+    },
+    {
+      "param"      : "lookahead.use_learned",
+      "type"       : "BOOL",
+      "default"    : false,
+      "description": "use learned clauses when selecting lookahead literal"
+    },
+    {
+      "param"      : "lookahead_simplify.bca",
+      "type"       : "BOOL",
+      "default"    : true,
+      "description": "add learned binary clauses as part of lookahead simplification"
+    },
+    {
+      "param"      : "lookahead.global_autarky",
+      "type"       : "BOOL",
+      "default"    : false,
+      "description": "prefer to branch on variables that occur in clauses that are reduced"
+    },
+    {
+      "param"      : "lookahead.delta_fraction",
+      "type"       : "DOUBLE",
+      "default"    : 1.0,
+      "description": "number between 0 and 1, the smaller the more literals are selected for double lookahead"
+    },
+    {
+      "param"      : "lookahead.reward",
+      "type"       : "SYMBOL",
+      "default"    : "march_cu",
+      "description": "select lookahead heuristic: ternary, heule_schur (Heule Schur], heuleu (Heule Unit], unit, or march_cu"
+    }
+  ]
+}
+

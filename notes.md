@@ -1,3 +1,21 @@
+# Show Stoppers
+
+###  `LocalSearch::import`
+
+The `Extension` part of the `LocalSearch::import` is broken, because `extract_pb()` as currently designed requires two mutable borrows of `self`. It's a weird design, anyway, because it is a function that takes two closures. 
+
+### Hierarchical inheritance: `Solver` is a `local_search` is a `LocalSearchCore`
+
+`LocalSearchCore` is an interface. `LocalSearch` implements that interface. `Solver` elaborates on `LocalSearch`. Could possibly use composition, but it's not clear how that affects other subclasses of `LocalSearch`. 
+
+These dependencies are weird, as `LocalSearch` references `Solver` explicitly in `LocalSearch::add()`, `LocalSearch::reinit_with_solver()`,  and `LocalSearch::import()`.
+
+## Known issues
+
+`LocalSearch::add_cardinality` was changed to take a vector rather than a pointer and size, but the callers have not been adjusted. It should probably take a slice instead, too.
+
+
+
 # Redundancies
 
 ## Boolean variables and values

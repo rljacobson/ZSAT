@@ -1,7 +1,7 @@
 /*!
-  
+
   `Status`
-  
+
 */
 
 use crate::Theory;
@@ -12,7 +12,7 @@ use std::fmt::{Display, Formatter};
 pub enum Status {
   Input(Theory),
   Asserted(Theory),
-  Redundent(Theory),
+  Redundant(Theory),
   Deleted(Theory)
 }
 
@@ -25,7 +25,7 @@ impl Status {
     Status::Asserted(-1)
   }
   pub fn redundent() -> Status {
-    Status::Redundent(-1)
+    Status::Redundant(-1)
   }
   pub fn repeated() -> Status {
     Status::Deleted(-1)
@@ -33,7 +33,7 @@ impl Status {
 
   pub fn from_theory(redundent: bool, theory: Theory) -> Status {
     if redundent {
-      Status::Redundent(theory)
+      Status::Redundant(theory)
     } else {
       Status::Asserted(theory)
     }
@@ -51,7 +51,7 @@ impl Display for Status {
         match self {
           Status::Input(_) => 'i',
           Status::Asserted(_) => 'a',
-          Status::Redundent(_) => 'r',
+          Status::Redundant(_) => 'r',
           Status::Deleted(_) => 'd',
         };
 
