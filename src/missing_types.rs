@@ -41,7 +41,7 @@ pub type ExpressionVector
 pub type Extension = ();
 pub type Justification = ();
 pub type ModelConverter = ();
-pub type MUS = ();
+pub type MinimalUnsatisfiableSet = (); //MUS
 /// Binary Set-Propogation-Redundent Clauses
 pub type Parallel = ();
 pub type Probing = ();
@@ -52,8 +52,6 @@ pub type SearchState = ();
 pub type Simplifier = ();
 pub type Stopwatch = ();
 pub type VariableQueue = ();
-
-
 
 
 /*

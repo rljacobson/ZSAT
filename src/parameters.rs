@@ -23,6 +23,7 @@ use json::{
 };
 use term::terminfo::Error::IoError;
 
+// todo: Should this be copy on write?
 pub type ParametersRef<'s> = Rc<RefCell<Parameters<'s>>>;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
@@ -46,6 +47,15 @@ pub struct Parameters<'s> {
   export     : bool,      // todo: Is this relevant? Kept it from z3.
   description: &'s str,
   parameters : HashMap<&'s str, Parameter<'s>>
+}
+
+impl<'s> Parameters<'s>{
+  // todo: Why have a getter for every variant of `ParameterValue`?
+  pub fn get_symbol(&self, symbol: &str) -> Option<ParameterValue> {
+    self.parameters
+        .get(symbol)
+        .and_then(| v | Some(v.default_value))
+  }
 }
 
 fn json_value_to_parameter_value(datatype: &str, json_value: &JsonValue) -> JsonResult<ParameterValue> {

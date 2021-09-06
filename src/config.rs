@@ -7,7 +7,7 @@
 use std::rc::Rc;
 
 use crate::{
-  symbol_table::Symbol,
+  symbol_table::SymbolData,
   missing_types::{Parameters, ParameterDescriptions}
 };
 
@@ -103,7 +103,7 @@ pub struct Config<'s> {
   fast_glue_avg             : f64,
   slow_glue_avg             : f64,
   inprocess_max             : u32,
-  inprocess_out             : Symbol<'s>,
+  inprocess_out             : SymbolData<'s>,
   random_freq               : f64,
   pub random_seed           : u32,
   burst_search              : u32,
@@ -174,7 +174,7 @@ pub struct Config<'s> {
   // DRAT proofs
   drat            : bool,
   drat_binary     : bool,
-  drat_file       : Symbol<'s>,
+  drat_file       : SymbolData<'s>,
   drat_check_unsat: bool,
   drat_check_sat  : bool,
   drat_activity   : bool,
@@ -200,7 +200,9 @@ pub struct Config<'s> {
 impl<'s> Config<'s>{
 
   pub fn new(parameters: ParametersRef){
+    Self{
 
+    }
   }
 
   pub fn update_parameters(parameters: ParametersRef){

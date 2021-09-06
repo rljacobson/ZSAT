@@ -2,54 +2,73 @@
 Defines the `SolverCore` trait and its canonical implementation `Solver`.
 */
 
-use std::rc::Rc;
+use std::{
+  collections::{
+    HashSet,
+    HashMap,
+  },
+  rc::Rc,
+};
 
-use crate::{config::Config, data_structures::{
-  ExponentialMovingAverage,
-  RandomGenerator,
-  Statistic,
-  Statistics
-}, lifted_bool::LiftedBoolVector, literal::{
-  Literal,
-  LiteralSet,
-  LiteralVector,
-}, local_search::LocalSearchCore, missing_types::{
-  AsymmBranch,
-  BinarySPR,
-  ClauseAllocator,
-  Cleaner,
-  Cuber,
-  CutSimplifier,
-  DRAT,
-  Extension,
-  Justification,
-  ModelConverter,
-  MUS,
-  Parallel,
-  ParamsRef,
-  Probing,
-  SCC,
-  ScopedLimitTrail,
-  SearchState,
-  Simplifier,
-  Stopwatch,
-  VariableQueue,
-}, model::Model, ResourceLimit, status::Status, clause::{
-  ClauseWrapperVector,
-  ClauseVector,
-}, watched::WatchList, BoolVariableVector};
-use crate::parameters::ParametersRef;
-use crate::data_structures::{ApproximateSet, OredIntegerSet};
-use std::collections::{HashSet, HashMap};
+use crate::{
+  BoolVariableVector,
+  clause::{
+    ClauseWrapperVector,
+    ClauseVector,
+  },
+  config::Config,
+  data_structures::{
+    ExponentialMovingAverage,
+    RandomGenerator,
+    Statistic,
+    Statistics,
+  },
+  data_structures::{
+    ApproximateSet,
+    OredIntegerSet,
+  },
+  lifted_bool::LiftedBoolVector,
+  literal::{
+    Literal,
+    LiteralSet,
+    LiteralVector,
+  },
+  local_search::LocalSearchCore,
+  missing_types::{
+    AsymmBranch,
+    BinarySPR,
+    ClauseAllocator,
+    Cleaner,
+    Cuber,
+    CutSimplifier,
+    DRAT,
+    Extension,
+    Justification,
+    ModelConverter,
+    MUS,
+    Parallel,
+    ParamsRef,
+    Probing,
+    SCC,
+    ScopedLimitTrail,
+    SearchState,
+    Simplifier,
+    Stopwatch,
+    VariableQueue,
+  },
+  model::Model,
+  parameters::ParametersRef,
+  ResourceLimit,
+  status::Status,
+  watched::WatchList,
+};
+use crate::missing_types::MinimalUnsatisfiableSet;
 
 
 type LevelApproximateSet = OredIntegerSet<u32, u32>;
 type IndexSet = HashSet<u32>;
 
-struct BinaryClause {
-  literal1: Literal,
-  literal2: Literal
-}
+struct BinaryClause(Literal, Literal);
 
 pub trait SolverCore {
   fn new(resource_limit: &ResourceLimit) -> Self;
@@ -129,30 +148,15 @@ struct Scope {
   pub inconsistent         : bool
 }
 
-impl<'s> Solver<'s> {
-  pub fn collect_statistics(&self, st: &mut Statistics){
-    self.statistics.collect_statistics(st);
-    self.cleaner.collect_statistics(st);
-    self.simplifier.collect_statistics(st);
-    self.scc.collect_statistics(st);
-    self.asymm_branch.collect_statistics(st);
-    self.probing.collect_statistics(st);
-    if let Some(ext) = &self.ext {
-      ext.collect_statistics(st);
-    }
-    if let Some(local_search) = &self.local_search{
-      local_search.collect_statistics(st);
-    }
-    if let Some(cut_simplifier) = &self.cut_simplifier{
-      cut_simplifier.collect_statistics(st);
-    }
-    st.extend(&self.aux_statistics);
-  }
-}
-
 #[derive(Clone, Eq, PartialEq, Debug, Hash)]
 pub struct Solver<'s> {
-  // todo: What should be `RC`'s in this struct? Should the `Rc`s be `Arc`s?
+
+  // Data members that should be in SolverCore.
+  // todo: Consider putting getters & setters in SolverCore. Problem is, that would make it
+  //       public. At least here we can specify finer-grained access.
+  pub resource_limit: ResourceLimit,
+
+  // todo: What should be `RC`'s in this struct? Should the `Rc`s be `Arc`s? `COW`s?
   checkpoint_enabled: bool,
   config            : Config<'s>,
   statistics        : SolverStatistics,
@@ -172,7 +176,7 @@ pub struct Solver<'s> {
   asymm_branch      : AsymmBranch,
   probing           : Probing,
   is_probing        : bool,              // defaults to false
-  mus               : MUS,               // MUS for minimal core extraction
+  mus               : MinimalUnsatisfiableSet,               // MUS for minimal core extraction
   binspr            : BinarySPR,
   inconsistent      : bool,
   searching         : bool,
@@ -244,7 +248,7 @@ pub struct Solver<'s> {
   scopes            : Vec<Scope>,
   vars_lim          : ScopedLimitTrail,
   stopwatch         : Stopwatch,
-  params            : ParametersRef<'s>,
+  pub(crate) params : ParametersRef<'s>,
   clone             : Rc<Solver<'s>>,     // for debugging purposes
   assumptions       : LiteralVector,      // additional assumptions during check
   assumption_set    : LiteralSet,         // set of enabled assumptions
@@ -303,7 +307,7 @@ pub struct Solver<'s> {
   m_ext_antecedents : LiteralVector,
 
 
-  m_diff_levels: Vec<char>,
+  m_diff_levels     : Vec<char>,
 
   // lemma minimization
   m_unmark          : BoolVariableVector,
@@ -329,6 +333,227 @@ pub struct Solver<'s> {
   m_binary_clause_graph : Vec<LiteralVector>,
 
 
-
 }
 
+impl Default<'s> for Solver<'s> {
+  fn default() -> Self {
+    Self{
+      // Data members that should be in SolverCore.
+      pub resource_limit : ResourceLimit::new(),
+
+      checkpoint_enabled: false,
+      config            : Config::d>,
+      statistics        : SolverStatistics,
+      pub ext           : Option<Box<Extension>>,
+      cut_simplifier    : Option<Box<CutSimplifier>>,
+      par               : Parallel,
+      pub drat          : DRAT, // DRAT for generating proofs
+      cls_allocator     : ClauseAllocator,
+      cls_allocator_idx : bool,
+      rand              : RandomGenerator,
+      cleaner           : Cleaner,
+      model             : Model,
+      mc                : ModelConverter,
+      model_is_current  : bool,
+      simplifier        : Simplifier,
+      scc               : SCC,
+      asymm_branch      : AsymmBranch,
+      probing           : Probing,
+      is_probing        : bool,              // defaults to false
+      mus               : MinimalUnsatisfiableSet,               // MUS for minimal core extraction
+      binspr            : BinarySPR,
+      inconsistent      : bool,
+      searching         : bool,
+
+      // A conflict is usually a single justification. That is, a justification for false. If `not_l` is not
+      // `Literal::NULL`, then `conflict` is a justification for `l`, and the conflict is union of `no_l` and `conflict`.
+      conflict        : Justification,
+      not_l           : Literal,
+      pub clauses     : ClauseVector,
+      learned         : ClauseVector,
+      num_frozen      : u32,
+      active_vars     : Vec<u32>,
+      free_vars       : Vec<u32>,
+      vars_to_reinit  : Vec<u32>,
+      pub watches     : Vec<WatchList>,
+      assignment      : LiftedBoolVector,
+      justification   : Vec<Justification>,
+      decision        : Vec<bool>,
+      mark            : Vec<bool>,
+      lit_mark        : Vec<bool>,
+      eliminated      : Vec<bool>,
+      external        : Vec<bool>,
+      var_scope       : Vec<u32>,
+      touched         : Vec<u32>,
+      touch_index     : u32,
+      replay_assign   : LiteralVector,
+
+      // branch variable selection:
+      activity        : Vec<u32>,
+      activity_inc    : u32,
+      last_conflict   : Vec<u64>,
+      last_propagation: Vec<u64>,
+      participated    : Vec<u64>,
+      canceled        : Vec<u64>,
+      reasoned        : Vec<u64>,
+      action          : i32,
+      step_size       : f64,
+
+      // phase
+      pub phase             : Vec<bool>,
+      pub best_phase        : Vec<bool>,
+      pub best_phase_size   : u32,
+      prev_phase            : Vec<bool>,
+      assigned_since_gc     : Vec<char>,
+      search_state          : SearchState,
+      search_unsat_conflicts: u32,
+      search_sat_conflicts  : u32,
+      search_next_toggle    : u32,
+      phase_counter         : u32,
+      rephase_lim           : u32,
+      rephase_inc           : u32,
+      reorder_lim           : u32,
+      reorder_inc           : u32,
+      case_split_queue      : VariableQueue,
+      qhead                 : u32,
+      scope_lvl             : u32,
+      search_lvl            : u32,
+      fast_glue_avg         : ExponentialMovingAverage,
+      slow_glue_avg         : ExponentialMovingAverage,
+      fast_glue_backup      : ExponentialMovingAverage,
+      slow_glue_backup      : ExponentialMovingAverage,
+      trail_avg             : ExponentialMovingAverage,
+      pub trail             : LiteralVector,
+      clauses_to_reinit     : ClauseWrapperVector,
+      reason_unknown        : String,
+      visited               : Vec<u32>,
+      visited_ts            : u32,
+
+      scopes            : Vec<Scope>,
+      vars_lim          : ScopedLimitTrail,
+      stopwatch         : Stopwatch,
+      pub(crate) params : ParametersRef<'s>,
+      clone             : Rc<Solver<'s>>,     // for debugging purposes
+      assumptions       : LiteralVector,      // additional assumptions during check
+      assumption_set    : LiteralSet,         // set of enabled assumptions
+      ext_assumption_set: LiteralSet,         // set of enabled assumptions
+      core              : LiteralVector,      // unsat core
+
+      par_id             : u32,
+      par_limit_in       : u32,
+      par_limit_out      : u32,
+      par_num_vars       : u32,
+      par_syncing_clauses: bool,
+
+      cuber         : Box<Cuber>,
+      local_search  : Option<Box<dyn LocalSearchCore>>,
+      aux_statistics: Statistics,
+
+      // -----------------------
+      //
+      // Search
+      //
+      // -----------------------
+
+      m_conflicts_since_init    : u32,  // { 0 };
+      m_restarts                : u32,  // { 0 };
+      m_restart_next_out        : u32,  // { 0 };
+      m_conflicts_since_restart : u32,  // { 0 };
+      m_force_conflict_analysis : bool, // { false };
+      m_simplifications         : u32,  // { 0 };
+      m_restart_threshold       : u32,  // { 0 };
+      m_luby_idx                : u32,  // { 0 };
+      m_conflicts_since_gc      : u32,  // { 0 };
+      m_gc_threshold            : u32,  // { 0 };
+      m_defrag_threshold        : u32,  // { 0 };
+      m_num_checkpoints         : u32,  // { 0 };
+      m_min_d_tk                : f64,  // { 0 } ;
+      m_next_simplify           : u32,  // { 0 };
+      m_simplify_enabled        : bool, // { true };
+      m_restart_enabled         : bool, // { true };
+
+      m_min_core          : LiteralVector,
+      m_min_core_valid    : bool,          // { false };
+
+      m_last_positions    : Vec<usize>,
+      m_last_position_log : u32,
+      m_restart_logs      : u32,
+
+
+      // PROTECTED
+      // -----------------------
+      //
+      // Conflict resolution
+      //
+      // -----------------------
+      m_conflict_lvl    : u32,
+      m_lemma           : LiteralVector,
+      m_ext_antecedents : LiteralVector,
+
+
+      m_diff_levels     : Vec<char>,
+
+      // lemma minimization
+      m_unmark          : BoolVariableVector,
+      m_lvl_set         : LevelApproximateSet,
+      m_lemma_min_stack : LiteralVector,
+
+
+      // -----------------------
+      //
+      // Backtracking
+      //
+      // -----------------------
+
+      m_user_scope_literals : LiteralVector,
+      m_free_var_freeze     : Vec<BoolVariableVector>,
+      m_aux_literals        : LiteralVector,
+      m_user_bin_clauses    : Vec<BinaryClause>,
+
+
+      // Auxiliary
+      m_antecedents         : HashMap<u32, IndexSet>,
+      m_todo_antecedents    : LiteralVector,
+      m_binary_clause_graph : Vec<LiteralVector>,
+
+    }
+  }
+}
+
+
+impl<'s> Solver<'s> {
+
+
+
+  pub fn from_params_limit(params: ParametersRef, resource_limit: &ResourceLimit) -> Self{
+    Self{
+      params,
+      resource_limit: resource_limit.clone(),
+      ..Self::default
+    }
+  }
+
+
+  pub fn resource_limit(&self) -> &ResourceLimit {
+    &self.resource_limit
+  }
+
+  pub fn collect_statistics(&self, st: &mut Statistics){
+    self.statistics.collect_statistics(st);
+    self.cleaner.collect_statistics(st);
+    self.simplifier.collect_statistics(st);
+    self.scc.collect_statistics(st);
+    self.asymm_branch.collect_statistics(st);
+    self.probing.collect_statistics(st);
+    if let Some(ext) = &self.ext {
+      ext.collect_statistics(st);
+    }
+    if let Some(local_search) = &self.local_search{
+      local_search.collect_statistics(st);
+    }
+    if let Some(cut_simplifier) = &self.cut_simplifier{
+      cut_simplifier.collect_statistics(st);
+    }
+    st.extend(&self.aux_statistics);
+  }
+}

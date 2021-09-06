@@ -18,6 +18,7 @@ pub type VectorIndexSet = HashSet<usize>;
 
 // No derives necessary.
 // todo: figure out what VectorPool needs.
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Default)]
 pub struct VectorPool {
   // vectors: Vec<PooledClause>,
 

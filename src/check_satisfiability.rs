@@ -15,7 +15,7 @@
 use std::rc::Rc;
 
 use crate::{LiftedBool, Model};
-use crate::symbol_table::Symbol;
+use crate::symbol_table::SymbolData;
 use crate::missing_types::*;
 
 type ExpressionVector = Vec<Expression>;
@@ -52,7 +52,7 @@ pub trait SatisfiabilityCheckResult {
       self.set_reason_unknown(format!("{}", eh.caller_id()).as_str());
     }
   }
-  fn get_labels(&self) -> Option<&Vec<Symbol>>;
+  fn get_labels(&self) -> Option<&Vec<SymbolData>>;
   // todo: In the absence of our own smart pointer type, do we need a manager at all?
   fn get_ast_manager(&self) -> &ASTManager;
   fn collect_timer_stats(&self, statistics: &mut Statistics);
@@ -141,7 +141,7 @@ impl SatisfiabilityCheckResult for SimpleSatisfiabilityCheckResult {
     self.reason_unknown_msg = msg.to_string();
   }
 
-  fn get_labels(&self) -> Option<&Vec<Symbol>>{
+  fn get_labels(&self) -> Option<&Vec<SymbolData>>{
     None
   }
 
