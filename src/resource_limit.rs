@@ -4,6 +4,9 @@
   
 */
 
+use std::cell::RefCell;
+use std::ops::{Deref, DerefMut};
+use std::rc::Rc;
 use std::sync::{RwLock, Arc, RwLockWriteGuard, Mutex};
 use std::sync::atomic::{AtomicBool, AtomicU32};
 
@@ -15,7 +18,10 @@ static ZSAT_MAX_FRAMES_MSG   : &str = "max. frames exceeded";
 static ZSAT_NO_PROOFS_MSG    : &str = "component does not support proof generation";
 static ZSAT_MAX_RESOURCE_MSG : &str = "max. resource limit exceeded";
 
-static GLOBAL_RESOURCE_LIMIT_MUTEX: Mutex<()> = Mutex::new(());
+// // todo: Replace with `RwLock`.
+// static GLOBAL_RESOURCE_LIMIT_MUTEX: Mutex<()> = Mutex::new(());
+
+pub type ArcRwResourceLimit = Arc<RwLock<ResourceLimit>>;
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Default)]
 pub struct ResourceLimit {
@@ -27,9 +33,9 @@ pub struct ResourceLimit {
   /// The min element of `self.limits`.
   limit: u64,
   /// A non-increasing sequence consisting of previous values of `self.limit`.
-  // tod: Why are we keeping track of the limits anyway? 
+  // todo: Why are we keeping track of the limits anyway?
   limits: Vec<u64>,
-  children: Vec<ResourceLimit>, // todo: Is Arc needed here?
+  children: Vec<ArcRwResourceLimit>, // todo: Is Arc needed here?
 }
 
 impl ResourceLimit {
@@ -53,7 +59,7 @@ impl ResourceLimit {
   /// The smallest of the existing limit and `new_limit` becomes the new limit, and the old limit is
   /// pushed onto `limits`.
   ///
-  /// Trying to push `0` is equivalent to trying to pushing `u64::MAX`. Otherwise, it's a saturating
+  /// Trying to push `0` is equivalent to trying to push `u64::MAX`. Otherwise, it's a saturating
   //  add. One can think of `u64::MAX` as "unlimited".
   pub fn push(&mut self, delta_limit: u32) {
     let new_limit = match delta_limit as u64 {
@@ -64,7 +70,7 @@ impl ResourceLimit {
     self.limits.push_back(self.limit);
     self.limit = u64::min(new_limit, self.limit);
 
-    // todo: Why is this not guarded? Also, why aren't the children also reset? (Could use `reset_cancel()`.
+    // todo: Why aren't the children also reset? (Could use `reset_cancel()`.
     self.cancel = 0.into();
   }
 
@@ -76,15 +82,17 @@ impl ResourceLimit {
     self.cancel = 0.into();
   }
 
-  pub fn push_child(&mut self, resource_limit: ResourceLimit){
-    #[allow(dead_code)]
-    let lock = GLOBAL_RESOURCE_LIMIT_MUTEX.lock().unwrap();
+  pub fn push_child(&mut self, resource_limit: ArcRwResourceLimit){
+    // Instead of a global lock within push_child, the caller must access self through the RwLock.
+    // #[allow(dead_code)]
+    // let lock = GLOBAL_RESOURCE_LIMIT_MUTEX.lock().unwrap();
     self.children.push(resource_limit);
   }
 
   pub fn pop_child(&mut self){
-    #[allow(dead_code)]
-    let lock = GLOBAL_RESOURCE_LIMIT_MUTEX.lock().unwrap();
+    // Instead of a global lock within push_child, the caller must access self through the RwLock.
+    // #[allow(dead_code)]
+    // let lock = GLOBAL_RESOURCE_LIMIT_MUTEX.lock().unwrap();
     self.children.pop();
   }
   
@@ -92,7 +100,7 @@ impl ResourceLimit {
   // Todo: Why not return `is_cancelled()`?
   // Todo: Should `is_cancelled()`/`not_cancelled()` return an enum variant?
   pub fn inc_by(&mut self, n: u32) -> bool {
-    self.count += n;
+    self.count += n as u64;
     self.not_canceled()
   }
 
@@ -129,17 +137,15 @@ impl ResourceLimit {
   }
 
   pub fn cancel(&mut self) {
-    #[allow(dead_code)]
-    let lock = GLOBAL_RESOURCE_LIMIT_MUTEX.lock().unwrap();
+    // #[allow(dead_code)]
+    // let lock = GLOBAL_RESOURCE_LIMIT_MUTEX.lock().unwrap();
     self.set_cancel(*self.cancel + 1)
-    // `GLOBAL_RESOURCE_LIMIT_MUTEX` is unlocked as `lock` goes out of scope.
   }
 
   pub fn reset_cancel(&mut self){
-    #[allow(dead_code)]
-    let lock = GLOBAL_RESOURCE_LIMIT_MUTEX.lock().unwrap();
+    // #[allow(dead_code)]
+    // let lock = GLOBAL_RESOURCE_LIMIT_MUTEX.lock().unwrap();
     self.set_cancel(0)
-    // `GLOBAL_RESOURCE_LIMIT_MUTEX` is unlocked as `lock` goes out of scope.
   }
 
   pub fn inc_cancel(&mut self) {
@@ -147,8 +153,8 @@ impl ResourceLimit {
   }
 
   pub fn dec_cancel(&mut self) {
-    #[allow(dead_code)]
-    let lock = GLOBAL_RESOURCE_LIMIT_MUTEX.lock().unwrap();
+    // #[allow(dead_code)]
+    // let lock = GLOBAL_RESOURCE_LIMIT_MUTEX.lock().unwrap();
     if self.cancel > 0 {
       set_cancel(*self.cancel - 1);
     }
@@ -162,14 +168,17 @@ impl ResourceLimit {
   `ResourceLimit` in its constructor and pops it in its destructor.
 */
 pub  struct ScopedResourceLimit {
-  resource_limit: Arc<ResourceLimit>
+  resource_limit: ArcRwResourceLimit
 }
 
 impl ScopedResourceLimit{
-  pub fn new(mut resource_limit: Arc<ResourceLimit>, limit: u32) -> ScopedResourceLimit {
-    resource_limit.push(limit);
+  pub fn new(mut resource_limit: ArcRwResourceLimit, limit: u32) -> ScopedResourceLimit {
+    { // Write guard scope
+      let mut write_guarded_resource_limit = resource_limit.write().unwrap();
+      write_guarded_resource_limit.deref().push(limit);
+    }
     ScopedResourceLimit{
-      resource_limit: resource_limit
+      resource_limit
     }
   }
 }
@@ -189,27 +198,35 @@ impl Drop for ScopedResourceLimit{
   suspended.
 */
 pub struct ScopedSuspendedResourceLimit {
-  resource_limit        : Arc<ResourceLimit>,
+  resource_limit        : ArcRwResourceLimit,
   original_suspend_state: bool
 }
 
 impl ScopedSuspendedResourceLimit{
-  pub fn new(mut resource_limit: Arc<ResourceLimit>) -> ScopedSuspendedResourceLimit {
-    let original_suspend_state = resource_limit.suspend;
+  pub fn new(mut resource_limit: ArcRwResourceLimit) -> ScopedSuspendedResourceLimit {
+    let mut original_suspend_state: bool = false;
+    { // Write guard scope
+      let mut write_guarded_resource_limit = resource_limit.write().unwrap();
+      original_suspend_state = write_guarded_resource_limit.suspend;
 
-    resource_limit.suspend = true;
-
+      write_guarded_resource_limit.suspend = true;
+    }
     ScopedSuspendedResourceLimit{
       resource_limit,
       original_suspend_state
     }
   }
 
-  pub fn new_with_state(mut resource_limit: Arc<ResourceLimit>, suspend: bool) -> ScopedSuspendedResourceLimit {
-    let original_suspend_state = resource_limit.suspend;
-    resource_limit.suspend |= suspend;
+  pub fn new_with_state(mut resource_limit: ArcRwResourceLimit, suspend: bool) -> ScopedSuspendedResourceLimit {
+    let mut original_suspend_state: bool = false;
+    { // Write guard scope
+      let mut write_guarded_resource_limit = resource_limit.write().unwrap();
 
-    ScopedSuspendedResourceLimit {
+      original_suspend_state = write_guarded_resource_limit.suspend;
+      write_guarded_resource_limit.suspend |= suspend;
+    }
+
+    ScopedSuspendedResourceLimit{
       resource_limit,
       original_suspend_state
     }
@@ -219,7 +236,7 @@ impl ScopedSuspendedResourceLimit{
 
 impl Drop for ScopedSuspendedResourceLimit{
   fn drop(&mut self) {
-    self.resource_limit.suspend = self.original_suspend_state;
+    self.resource_limit.write().unwrap().suspend = self.original_suspend_state;
   }
 }
 
@@ -230,13 +247,14 @@ impl Drop for ScopedSuspendedResourceLimit{
   special case of this struct.
 */
 pub  struct ScopedResourceLimits {
-  resource_limit: Arc<ResourceLimit>,
+  resource_limit: ArcRwResourceLimit,
   push_count: u32
 }
 
 impl ScopedResourceLimits{
-  pub fn new(mut resource_limit: Arc<ResourceLimit>, limit: u32) -> ScopedResourceLimits {
-    resource_limit.push(limit);
+  pub fn new(mut resource_limit: ArcRwResourceLimit, limit: u32) -> ScopedResourceLimits {
+    resource_limit.write().unwrap().push(limit);
+
     ScopedResourceLimits{
       resource_limit,
       push_count: 0
@@ -244,15 +262,17 @@ impl ScopedResourceLimits{
   }
 
   pub fn push(&mut self, delta_limit: u32){
-    self.resource_limit.push(delta_limit);
+    self.resource_limit.write().unwrap().push(delta_limit);
     self.push_count += 1;
   }
 }
 
 impl Drop for ScopedResourceLimits{
   fn drop(&mut self) {
-    for n in 0..self.push_count {
-      self.resource_limit.pop()
+    let mut write_guarded_resource_limit= self.resource_limit.write().unwrap();
+
+    for _ in 0..self.push_count {
+      write_guarded_resource_limit.pop()
     }
   }
 }

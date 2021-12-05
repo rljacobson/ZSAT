@@ -63,6 +63,7 @@ use crate::{
   watched::WatchList,
 };
 use crate::missing_types::MinimalUnsatisfiableSet;
+use crate::resource_limit::ArcRwResourceLimit;
 
 
 type LevelApproximateSet = OredIntegerSet<u32, u32>;
@@ -71,7 +72,7 @@ type IndexSet = HashSet<u32>;
 struct BinaryClause(Literal, Literal);
 
 pub trait SolverCore {
-  fn new(resource_limit: &ResourceLimit) -> Self;
+  fn new(resource_limit: ArcRwResourceLimit) -> Self;
   fn add_clause(n: u32, literals: LiteralVector, status: Status);
   fn check(literals: Vec<u32>);
   fn at_base_level(&self)       -> bool;
@@ -154,7 +155,7 @@ pub struct Solver<'s> {
   // Data members that should be in SolverCore.
   // todo: Consider putting getters & setters in SolverCore. Problem is, that would make it
   //       public. At least here we can specify finer-grained access.
-  pub resource_limit: ResourceLimit,
+  pub resource_limit: ArcRwResourceLimit,
 
   // todo: What should be `RC`'s in this struct? Should the `Rc`s be `Arc`s? `COW`s?
   checkpoint_enabled: bool,
@@ -255,11 +256,11 @@ pub struct Solver<'s> {
   ext_assumption_set: LiteralSet,         // set of enabled assumptions
   core              : LiteralVector,      // unsat core
 
-  par_id             : u32,
+  pub(crate) par_id  : u32,
   par_limit_in       : u32,
   par_limit_out      : u32,
   par_num_vars       : u32,
-  par_syncing_clauses: bool,
+  pub par_syncing_clauses: bool,
 
   cuber         : Box<Cuber>,
   local_search  : Option<Box<dyn LocalSearchCore>>,
@@ -335,6 +336,7 @@ pub struct Solver<'s> {
 
 }
 
+/*
 impl Default<'s> for Solver<'s> {
   fn default() -> Self {
     Self{
@@ -519,12 +521,12 @@ impl Default<'s> for Solver<'s> {
     }
   }
 }
-
+*/
 
 impl<'s> Solver<'s> {
 
 
-
+/*
   pub fn from_params_limit(params: ParametersRef, resource_limit: &ResourceLimit) -> Self{
     Self{
       params,
@@ -532,10 +534,14 @@ impl<'s> Solver<'s> {
       ..Self::default
     }
   }
+*/
 
+  pub fn get_config(&self) -> &Config {
+    &self.config
+  }
 
-  pub fn resource_limit(&self) -> &ResourceLimit {
-    &self.resource_limit
+  pub fn resource_limit(&self) -> ArcRwResourceLimit {
+    self.resource_limit.clone()
   }
 
   pub fn collect_statistics(&self, st: &mut Statistics){

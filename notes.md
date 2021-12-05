@@ -4,11 +4,10 @@
 
 The `Extension` part of the `LocalSearch::import` is broken, because `extract_pb()` as currently designed requires two mutable borrows of `self`. It's a weird design, anyway, because it is a function that takes two closures. 
 
-### Hierarchical inheritance: `Solver` is a `local_search` is a `LocalSearchCore`
+### Hierarchical inheritance: `Solver` is a `solver_core`, `local_search` is a `LocalSearchCore`
 
-`LocalSearchCore` is an interface. `LocalSearch` implements that interface. `Solver` elaborates on `LocalSearch`. Could possibly use composition, but it's not clear how that affects other subclasses of `LocalSearch`. 
-
-These dependencies are weird, as `LocalSearch` references `Solver` explicitly in `LocalSearch::add()`, `LocalSearch::reinit_with_solver()`,  and `LocalSearch::import()`.
+`LocalSearchCore` is an interface. `LocalSearch` implements that interface. `Solver` elaborates on
+`SolverCore`.
 
 ## Symbols & Parameters
 
@@ -63,8 +62,10 @@ These dependencies are weird, as `LocalSearch` references `Solver` explicitly in
 # Generated files
 
 The z3 build system uses a Python script to generate source files. The input to the script are *.PYG
-files (PYthon Generated files). ZSat uses standard JSON as input instead. ZSat also uses a
-fluidity-type
+files (PYthon Generated files). ZSat uses standard JSON as input instead.
+
+Configuration parameters in the z3 code base are defined in *.pyg files and generated at
+compile time. In contrast, we read in the parameter database from a JSON file at runtime.
 
 
 # Dictionary of terms

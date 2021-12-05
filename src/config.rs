@@ -109,7 +109,7 @@ pub struct Config<'s> {
   burst_search              : u32,
   enable_pre_simplify       : bool,
   max_conflicts             : u32,
-  num_threads               : u32,
+  pub(crate) num_threads    : u32,
   ddfw_search               : bool,
   ddfw_threads              : u32,
   prob_search               : bool,

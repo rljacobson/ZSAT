@@ -6,7 +6,9 @@ $x_1 \lor \overline{x}_2 \lor \overline{x}_3 \lor x_4$.
 
  */
 
+use std::fmt::{Display, Formatter};
 use std::ops::Index;
+use itertools::Itertools;
 
 use crate::{
   BoolVariable,
@@ -233,6 +235,19 @@ impl Index<u32> for Clause {
     sassert!(idx < self.size);
 
     &self.literals[index as usize]
+  }
+}
+
+impl Display for Clause {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    write!(
+      f,
+      "({}){}{}{}",
+      self.literals.format(" "),                  // False error: `Format` does implement `Display`.
+      if self.is_removed() { "x" } else { "" },
+      if self.is_strengthened() { "+" } else { "" },
+      if self.is_learned() { "*" } else { "" },
+    )
   }
 }
 

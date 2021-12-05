@@ -4,7 +4,7 @@ Types associated with configuration parameters.
 Configuration parameters in the z3 code base are defined in *.pyg files and generated at
 compile time. In contrast, we read in the parameter database from a JSON file at runtime.
 
- */
+*/
 
 use std::{
   fs::read_to_string,
@@ -21,7 +21,8 @@ use json::{
   Result as JsonResult,
   JsonError
 };
-use term::terminfo::Error::IoError;
+// use term::terminfo::Error::IoError;
+use std::ops::Index;
 
 // todo: Should this be copy on write?
 pub type ParametersRef<'s> = Rc<RefCell<Parameters<'s>>>;
@@ -36,9 +37,9 @@ pub enum ParameterValue<'s> {
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash)]
 pub struct Parameter<'s> {
-  name         : &'static str,
-  default_value: ParameterValue<'s>,
-  description  : &'static str
+  name       : &'static str,
+  value      : ParameterValue<'s>,
+  description: &'static str
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash)]
@@ -50,12 +51,22 @@ pub struct Parameters<'s> {
 }
 
 impl<'s> Parameters<'s>{
-  // todo: Why have a getter for every variant of `ParameterValue`?
-  pub fn get_symbol(&self, symbol: &str) -> Option<ParameterValue> {
+
+  /// Get's the `Parameter` associated  with `symbol` and returns its `ParameterValue`.
+  pub fn get_value(&self, symbol: &str) -> Option<ParameterValue> {
     self.parameters
         .get(symbol)
-        .and_then(| v | Some(v.default_value))
+        .and_then(| v | Some(v.value))
   }
+}
+
+impl<'s> Index<&str> for Parameters<'s>{
+  type Output = Parameter<'s>;
+
+  fn index(&self, index: &str) -> &Self::Output {
+    self.parameters.index(index)
+  }
+
 }
 
 fn json_value_to_parameter_value(datatype: &str, json_value: &JsonValue) -> JsonResult<ParameterValue> {
@@ -90,7 +101,7 @@ pub fn deserialize_parameters(file_path: &str) -> JsonResult<Parameters> {
       let parameter =
           Parameter {
             name: key,
-            default_value: json_value_to_parameter_value(record["type"].as_str()?, &record["default"])?,
+            value: json_value_to_parameter_value(record["type"].as_str()?, &record["default"])?,
             description: record["description"].as_str()?
           };
 
@@ -106,9 +117,9 @@ pub fn deserialize_parameters(file_path: &str) -> JsonResult<Parameters> {
 
   Ok(
     Parameters{
-      module: &object["module"].as_str()?,
+      module: object["module"].as_str()?,
       export: object["export"].as_bool()?,
-      description: &object["description"].as_str()?,
+      description: object["description"].as_str()?,
       parameters
     }
   )
@@ -126,18 +137,19 @@ pub fn get_global_parameters(module: &str) -> Result<ParametersRef, dyn Error> {
     match GLOBAL_PARAMETERS.get(module) {
 
       None => {
-        let path = match PARAMETER_PATHS.get(module) {
+        let path: &str = match PARAMETER_PATHS.get(module) {
                      None       => Err(Error::DeserializeParameters),
-                     Some(path) => Ok(path)
+                     Some(&path) => Ok(path)
                    }?;
-        let parameters     = deserialize_parameters(path)?;
-        let parameters_ref = Rc::new(RefCell::new(parameters));
-        GLOBAL_PARAMETERS.insert(module, parameters_ref);
+        let parameters    : Parameters    = deserialize_parameters(path)?;
+        let parameters_ref: ParametersRef = Rc::new(RefCell::new(parameters));
 
-        Ok(parameters_ref.clone())
+        GLOBAL_PARAMETERS.insert(module, parameters_ref.clone());
+
+        Ok(parameters_ref)
       }
 
-      Some(parameters_ref) => Ok(parameters_ref.clone())
+      Some(&parameters_ref) => Ok(parameters_ref)
 
     }
   }
@@ -146,8 +158,14 @@ pub fn get_global_parameters(module: &str) -> Result<ParametersRef, dyn Error> {
 
 #[cfg(test)]
 mod tests {
+  use super::*;
+
   #[test]
-  fn it_works() {
-    assert_eq!(2 + 2, 4);
+  fn get_params() {
+    let p    : Result<ParametersRef, dyn Error> = get_global_parameters("sat");
+    let p_ref: ParametersRef = p.unwrap();
+    let param: &Parameter    = &p_ref.borrow()["restart.emafastglue"];
+
+    assert_eq!(param.value, ParameterValue::Double(3e-2))
   }
 }

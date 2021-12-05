@@ -39,13 +39,14 @@ pub(crate) mod assertions {
     unimplemented!();
   }
 
-  /// A logged assert that includes source location on failure, where failure is non-fatal.
+  /// A logged assert that includes source location on failure, where failure is non-fatal, and
+  /// invokes debugger.
   #[macro_export]
   macro_rules! log_assert {
     ($cond:expr)=>{
       {
         #[cfg(feature = "debug")]
-        if $crate::log::assertions::ASSERTIONS_ENABLED && !(cond) {
+        if $crate::log::assertions::ASSERTIONS_ENABLED && !($cond) {
           $crate::log::assertions::notify_assertion_violation(stringify!($cond), file!(), line!());
           $crate::log::assertions::invoke_debugger();
         }
@@ -54,17 +55,19 @@ pub(crate) mod assertions {
   }
 
   /// A logged assert that includes source location on failure, where failure is non-fatal.
+  /// Unlike `log_assert`, `verify` is not guarded by a feature flag nor does it invoke the debugger.
   #[macro_export]
   macro_rules! verify {
-    ($a:expr)=>{
+    ($cond:expr)=>{
       {
-        if !(a){
+        if !($cond){
           // $crate::log::assertions::log_assert(stringify!($a), file!(), line!());
           $crate::log::assertions::notify_assertion_violation(
-            format!("Failed to verify: {}\n", code).as_str(),
-            file,
-            line
+            format!("Failed to verify: {}\n", stringify!($cond)).as_str(),
+            file!(),
+            line!()
           );
+          panic!();
         }
       }
     }
@@ -121,7 +124,7 @@ pub(crate) mod trace {
     ($tag:expr, $code:expr) => {
       {
         if ($crate::log::trace::is_trace_enabled($tag)) {
-          $crate::log::trace::trace_prefix(tag, function!(), file!(), line!()-2);
+          $crate::log::trace::trace_prefix($tag, function!(), file!(), line!()-2);
           $code ;
           $crate::log::trace::trace_suffix();
         }
@@ -159,6 +162,8 @@ pub(crate) mod verbosity {
     }
   }
 
+  /// Equivalent to z3's `CASSERT`.
+  // todo: Actually, `CASSERT` only runs if assertions are enabled and invokes the debugger.
   pub(crate) fn log_at_level(level: i32, msg: &str){
     if verbosity_is_at_least(level){
       verbose_emit(msg);

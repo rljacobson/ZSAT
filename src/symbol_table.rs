@@ -22,7 +22,7 @@ pub static mut SYMBOLS: SymbolTable<'s> = HashIndexing::default();
 /// of `symbol_map::table::Symbol<crate::symbol_table::SymbolData,
 /// u64>`, which in turn wraps a `SymbolData` and a `SymbolId`.
 
-// todo: Is this redundent given existence of `parameters::ParameterValue`?
+// todo: Is this redundant given existence of `parameters::ParameterValue`?
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
 pub enum SymbolData<'s> {

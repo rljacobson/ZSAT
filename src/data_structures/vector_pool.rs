@@ -11,18 +11,23 @@ A VectorPool is a shared pool of learned clauses that reuses memory and function
 use std::collections::HashSet;
 use std::error::Error;
 
-use crate::log::log_at_level;
+use crate::log::{
+  log_at_level,
+  log_assert,
+  verify
+};
 
 pub type VectorIndex    = usize;
 pub type VectorIndexSet = HashSet<usize>;
 
-// No derives necessary.
 // todo: figure out what VectorPool needs.
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Default)]
 pub struct VectorPool {
   // vectors: Vec<PooledClause>,
 
-  /// A `VectorPool` stores contiguous runs of the form |owner|length|0|1|2|...|n-1|.
+  /// Stores contiguous runs of the form |owner|length|0|1|2|...|n-1|.
+  // todo: This data layout is presumably for cache locality, but I doubt it matters, and it
+  // complicates the code significantly.
   vectors: Vec<VectorIndex>,
   /// The "real" number of elements stored in `vectors`, as opposed to what `vectors.len()` reports.
   size   : usize,
@@ -62,8 +67,8 @@ impl VectorPool {
   }
 
   /// Gives a pointer to the data of the vector at `index`
-  fn get_ptr(&self, index: VectorIndex) -> *VectorIndex {
-    return self.vectors.as_ptr() + index + 2;
+  fn get_ptr(&self, index: VectorIndex) -> *const VectorIndex {
+    return self.vectors.as_ptr() + index + 2; // todo: Why add 2 here?
   }
 
   /// Clears `vectors` and resets all bookkeeping to initial state. Resizes `vectors` and bookkeeping
@@ -119,8 +124,8 @@ impl VectorPool {
   }
 
   /// Returns a pointer to the vector data of the last vector?
-  pub fn get_vector(&mut self, owner: VectorIndex, mut n: usize, ptr: &mut VectorIndex)
-    -> Result<(*VectorIndex, size), dyn Error>
+  pub fn get_vector(&mut self, owner: VectorIndex,  ptr: &mut VectorIndex)
+    -> Result<(*const VectorIndex, size), dyn Error>
   {
     let mut head = self.heads[owner];
     let mut iterations: usize = 0;
@@ -150,14 +155,16 @@ impl VectorPool {
       self.at_end[owner] = (self.heads[owner] == self.tail);
 
       if !is_self {
-        n = self.get_length(head);
+        let n = self.get_length(head);
         unsafe {
-          *ptr = *self.get_ptr(head);
+          // todo: Change this type to VectorIndex.
+          let ptr: *const VectorIndex = self.get_ptr(head);
         }
         return Ok((ptr, n));
       }
       head = self.heads[owner];
     }
+
     return Err(Error);
   }
 

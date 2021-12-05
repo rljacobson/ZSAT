@@ -42,7 +42,7 @@ pub type Extension = ();
 pub type Justification = ();
 pub type ModelConverter = ();
 pub type MinimalUnsatisfiableSet = (); //MUS
-/// Binary Set-Propogation-Redundent Clauses
+/// Binary Set-Propagation-Redundant Clauses
 pub type Parallel = ();
 pub type Probing = ();
 pub type Proof = ();
