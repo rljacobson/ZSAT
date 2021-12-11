@@ -9,15 +9,73 @@ use std::collections::HashSet;
 use std::error::Error;
 use std::sync::Mutex;
 
+use crate::parameters::ParameterValue;
 use crate::{Literal, LiteralVector, ResourceLimit, Solver};
 use crate::clause::{Clause, ClauseVector};
-use crate::data_structures::{VectorIndexSet, VectorPool};
+// use crate::data_structures::{VectorIndexSet, VectorPool, VectorIndex};
 use crate::log::log_at_level;
 use crate::symbol_table::SymbolData;
 use std::borrow::BorrowMut;
 use std::rc::Rc;
 use crate::resource_limit::ArcRwResourceLimit;
 
+type VectorIndexSet = HashSet<usize>;
+type VectorIndex = usize;
+
+// todo: figure out what derives VectorPool needs.
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Default)]
+struct VectorPool {
+  /// The inner `Vec<VectorIndex>` represents the clause.
+  vectors: Vec<Vec<VectorIndex>>,
+  owners: Vec<VectorIndex>
+}
+
+impl VectorPool {
+/*
+  /// Given an `index` of the head of a vector, advances `index` to the head of the next vector. If the head of the last
+  /// vector is provided, `index` is "wrapped around" to `0`, which is the head of the first vector.
+  pub fn next(&self, index: &mut VectorIndex) {
+    log_assert!(index < self.size);
+
+    let n = index + 2 + self.get_length(*index);
+    if n >= self.size {
+      *index = 0;
+    }
+    else {
+      *index = n;
+    }
+  }
+ */
+
+  /// Clears `vectors` and `owners` and reserves `thread_count` space in each vector.
+  pub fn reserve(&mut self, thread_count: usize) {
+    self.vectors.clear();
+    self.vectors.reserve(thread_count);
+    self.owners.clear();
+    self.owners.reserve(thread_count);
+  }
+
+  pub fn add_vector(&mut self, owner: VectorIndex, vector: &Vec<VectorIndex>) {
+    self.vectors.push(vector.clone());
+    self.owner.push(owner);
+  }
+
+  /// Returns a pointer to the vector data of the last vector?
+  pub fn get_vector_for_owner(&mut self, owner: VectorIndex)
+    -> Option<&Vec<VectorIndex>>
+  {
+    let found = self.owners.iter().position(&owner);
+
+    match found {
+
+      Some(index) => Some(&self.vectors[index]),
+
+      None => None
+
+    }
+  }
+
+}
 
 // todo: Is this something that can be replaced with a standard utility struct?
 #[derive(Default, Clone, Eq, PartialEq, Debug, Hash)]
@@ -25,8 +83,8 @@ pub struct Parallel<'a, 'b> {
   units   : LiteralVector,
   unit_set: VectorIndexSet,
   literals: LiteralVector,
+  mux     : Mutex<VectorPool>,
   pool    : VectorPool,
-  mux     : Mutex<VectorPool>, // What is the mutex guarding? `self`?
 
   // For exchange with local search:
   num_clauses   : usize,
@@ -62,34 +120,34 @@ impl<'a, 'b> Parallel<'a, 'b> {
     }
   }
 
+  /// GLUCOSE heuristic:
+  /// https://www.ijcai.org/Proceedings/09/Papers/074.pdf
+  /// Plingeling heuristic:
+  /// https://epub.jku.at/obvulioa/content/titleinfo/5973528/full.pdf
+  /// http://fmv.jku.at/papers/Biere-SAT-Competition-2013-Lingeling.pdf
   fn enable_add(c: &Clause) -> bool {
-    /// GLUCOSE heuristic:
-    /// https://www.ijcai.org/Proceedings/09/Papers/074.pdf
-    /// Plingeling heuristic:
-    /// https://epub.jku.at/obvulioa/content/titleinfo/5973528/full.pdf
-    /// http://fmv.jku.at/papers/Biere-SAT-Competition-2013-Lingeling.pdf
     return (c.size() <= 40 && c.glue() <= 8) || c.glue() <= 2;
   }
 
-  pub fn init_solvers(&mut self, s: &mut Solver, num_extra_solvers: usize){
+  pub fn init_solvers(&mut self, solver: &mut Solver, num_extra_solvers: usize){
 
     let num_threads = num_extra_solvers + 1;
     self.solvers.reserve(num_extra_solvers);
     self.limits.reserve(num_extra_solvers);
-    let saved_phase = s.params.borrow().get_value("phase");//[("phase", SymbolData::new("caching"))];
+    let saved_phase = solver.parameters.borrow().get_value("phase");//[("phase", SymbolData::new("caching"))];
 
     for i in 0..num_extra_solvers {
-      s.params.set_uint("random_seed", s.rand());
+      solver.parameters["random_seed"] = solver.rand();
       if i == 1 + num_threads/2 {
-        s.params.set_sym("phase", symbol("random"));
+        solver.parameters["phase"] = ParameterValue::Symbol("random");
       }
-      self.solvers[i] = Rc::new(Solver::from_params_limit(s.params.clone(), &self.limits[i]));
-      self.solvers[i].copy(s, true);
-      self.solvers[i].set_par(this, i);
+      self.solvers[i] = Rc::new(Solver::from_params_limit(solver.parameters.clone(), &self.limits[i]));
+      self.solvers[i].copy(solver, true);
+      self.solvers[i].set_parallel(self, i);
       self.push_child(self.solvers[i].resource_limit());
     }
-    s.set_par(self, num_extra_solvers);
-    s.params.set_sym("phase", saved_phase);
+    solver.set_par(self, num_extra_solvers);
+    solver.parameters["phase"] = saved_phase;
   }
 
   pub fn push_child(&mut self, rl: ArcRwResourceLimit){ self.resource_limit.push_child(rl); }
@@ -108,12 +166,12 @@ impl<'a, 'b> Parallel<'a, 'b> {
     limit: &mut usize,
     output: &mut LiteralVector)
   {
-    if s.get_config().num_threads == 1 || s.par_syncing_clauses {
+    if s.get_config().num_threads == 1 || s.parallel_syncing_clauses {
       return;
     }
 
-    let old_par_syncing_clauses_value = s.par_syncing_clauses;
-    s.par_syncing_clauses = true;
+    let old_par_syncing_clauses_value = s.parallel_syncing_clauses;
+    s.parallel_syncing_clauses = true;
     { // Scope of `lock_guard` for `self.mux`
       let _lock_guard = self.mux.lock().unwrap();
 
@@ -130,21 +188,21 @@ impl<'a, 'b> Parallel<'a, 'b> {
       }
       *limit = self.units.len();
       // Restore previous sync clause value
-      s.par_syncing_clauses = old_par_syncing_clauses_value;
+      s.parallel_syncing_clauses = old_par_syncing_clauses_value;
     }
   }
 
   /// Add the clause to the shared clause pool.
   pub fn share_clause(&mut self, solver: &mut Solver, c: &Clause){
-    if solver.get_config().num_threads == 1 || !self.enable_add(c) || solver.par_syncing_clauses {
+    if solver.get_config().num_threads == 1 || !self.enable_add(c) || solver.parallel_syncing_clauses {
       return;
     }
 
-    let old_par_syncing_clauses = solver.par_syncing_clauses;
-    solver.par_syncing_clauses = true;
+    let old_par_syncing_clauses = solver.parallel_syncing_clauses;
+    solver.parallel_syncing_clauses = true;
 
     let n = c.size();
-    let owner = solver.par_id;
+    let owner = solver.parallel_id;
     log_at_level(3, format!("{}: share {}\n", owner, c).as_str());
     let _lock = self.mux.lock();
 
@@ -154,40 +212,40 @@ impl<'a, 'b> Parallel<'a, 'b> {
     }
     self.pool.end_add_vector();
 
-    solver.par_syncing_clauses = old_par_syncing_clauses;
+    solver.parallel_syncing_clauses = old_par_syncing_clauses;
   }
 
   /// Add the two-literal clause to the shared clause pool.
   pub fn share_literals(&mut self, solver: &mut Solver, l1: Literal, l2: Literal){
-    if solver.get_config().num_threads == 1 || solver.par_syncing_clauses{
+    if solver.get_config().num_threads == 1 || solver.parallel_syncing_clauses{
       return;
     }
 
-    let old_par_syncing_clauses = solver.par_syncing_clauses;
-    solver.par_syncing_clauses = true;
+    let old_par_syncing_clauses = solver.parallel_syncing_clauses;
+    solver.parallel_syncing_clauses = true;
 
     log_at_level(
       3,
-      format!("{}: share {} {}\n", solver.par_id, l1, l2).as_str()
+      format!("{}: share {} {}\n", solver.parallel_id, l1, l2).as_str()
     );
 
     {
       let _lock = self.mux.lock();
-      self.pool.begin_add_vector(solver.par_id.into(), 2);
+      self.pool.begin_add_vector(solver.parallel_id.into(), 2);
       self.pool.add_vector_elem(l1.index());
       self.pool.add_vector_elem(l2.index());
       self.pool.end_add_vector();
     }
 
-    solver.par_syncing_clauses = old_par_syncing_clauses;
+    solver.parallel_syncing_clauses = old_par_syncing_clauses;
   }
 
   /// Receive clauses from shared clause pool
   pub fn get_clauses(&mut self, s: &mut Solver) {
     if (s.m_par_syncing_clauses) { return; }
 
-    let old_par_syncing_clauses = s.par_syncing_clauses;
-    s.par_syncing_clauses  = true;
+    let old_par_syncing_clauses = s.parallel_syncing_clauses;
+    s.parallel_syncing_clauses  = true;
 
     let _lock = self.mux.lock();
 
@@ -197,7 +255,7 @@ impl<'a, 'b> Parallel<'a, 'b> {
     loop {
 
       let (n: u32, ptr: *usize) = // the result of the match
-        match self.pool.get_vector(owner, n, ptr) {
+        match self.pool.get_vector_for_owner(owner, n, ptr) {
 
           Err(_) => break,
 
@@ -221,12 +279,12 @@ impl<'a, 'b> Parallel<'a, 'b> {
 
 
 
-    s.par_syncing_clauses = old_par_syncing_clauses;
+    s.parallel_syncing_clauses = old_par_syncing_clauses;
   }
 
   /// Exchange from solver state to local search and back.
   pub fn from_solver(&self, s: &Solver) {}
-  
+
   pub fn to_solver(&self, s: &Solver) -> bool {
     // if (self.priorities.empty()) {
     //   return false;
