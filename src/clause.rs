@@ -336,7 +336,7 @@ impl Index<usize> for ClauseWrapper {
       },
 
       ClauseWrapper::Nonbinary(c)  => {
-        c[index]
+        &c[index]
       }
 
     }

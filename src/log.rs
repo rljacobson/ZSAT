@@ -40,15 +40,21 @@ pub(crate) mod assertions {
   }
 
   /// A logged assert that includes source location on failure, where failure is non-fatal, and
-  /// invokes debugger.
+  /// invokes debugger. Equivalent to `SASSERT` in Z3.
   #[macro_export]
   macro_rules! log_assert {
     ($cond:expr)=>{
       {
         #[cfg(feature = "debug")]
-        if $crate::log::assertions::ASSERTIONS_ENABLED && !($cond) {
-          $crate::log::assertions::notify_assertion_violation(stringify!($cond), file!(), line!());
-          $crate::log::assertions::invoke_debugger();
+        {
+          let  assertions_enabled = true;
+          unsafe{
+            assertions_enabled = $crate::log::assertions::ASSERTIONS_ENABLED;
+          }
+          if assertions_enabled && !($cond) {
+            $crate::log::assertions::notify_assertion_violation(stringify!($cond), file!(), line!());
+            $crate::log::assertions::invoke_debugger();
+          }
         }
       }
     }
@@ -77,7 +83,6 @@ pub(crate) mod assertions {
 pub(crate) mod trace {
 
   use std::io::{Stdout, stdout, Write};
-  use std::fmt::Debug;
   use std::collections::HashMap;
 
   pub(crate) static mut TRACE_STREAM: Stdout = stdout();
@@ -136,7 +141,6 @@ pub(crate) mod trace {
 // Global control over verbose messaging.
 pub(crate) mod verbosity {
   use std::io::{Stdout, stdout, Write};
-  use std::fmt::Debug;
 
   // todo: Make `VERBOSITY` an enum. Discriminants must be numerically compatible with Z3.
   // todo: Put `VERBOSITY` behind a mutex to get rid of `unsafe` and make thread safe.

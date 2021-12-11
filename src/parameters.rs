@@ -69,22 +69,55 @@ impl<'s> Index<&str> for Parameters<'s>{
 
 }
 
-fn json_value_to_parameter_value(datatype: &str, json_value: &JsonValue) -> JsonResult<ParameterValue> {
+fn json_value_to_parameter_value<'a, 'b, 'c>(datatype: &'a str, json_value: &'b JsonValue) -> JsonResult<ParameterValue<'c>> {
   match datatype {
 
-    "UINT"   => Ok(ParameterValue::UnsignedInteger(json_value.as_u64()?)),
+    "UINT"   => if let Some(number) = json_value.as_u64() {
+        Ok(ParameterValue::UnsignedInteger(number))
+      } else {
+        Err(
+          JsonError::wrong_type(
+            format!("Expected a parameter datatype, found `{}`.", json_value).as_str()
+          )
+        )
+      },
 
-    "BOOL"   => Ok(ParameterValue::Bool(json_value.as_bool()?)),
+    "BOOL"   => if let Some(value)= json_value.as_bool() {
+        Ok(ParameterValue::Bool(value))
+      } else {
+        Err(
+          JsonError::wrong_type(
+            format!("Expected a bool, found `{}`.", json_value).as_str()
+          )
+        )
+      }
 
-    "DOUBLE" => Ok(ParameterValue::Double(json_value.as_f64()?)),
+    "DOUBLE" => if let Some(number)= json_value.as_f64() {
+        Ok(ParameterValue::Double(number))
+      } else {
+        Err(
+          JsonError::wrong_type(
+            format!("Expected a double, found `{}`.", json_value).as_str()
+          )
+        )
+      },
 
-    "SYMBOL" => Ok(ParameterValue::Symbol(json_value.as_str()?)),
+    "SYMBOL" => if let Some(text) = json_value.as_str() {
+        Ok(ParameterValue::Symbol(text.clone()))
+      } else {
+        Err(
+          JsonError::wrong_type(
+            format!("Expected a symbol, found `{}`.", json_value).as_str()
+          )
+        )
+      },
 
-    _other   => Err(
-                  JsonError::wrong_type(
-                    format!("Expected a parameter datatype, found `{}`.", _other).as_str()
-                  )
-                )
+    _other   =>
+      Err(
+        JsonError::wrong_type(
+          format!("Expected a parameter datatype, found `{}`.", _other).as_str()
+        )
+      )
 
   }
 }

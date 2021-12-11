@@ -9,7 +9,6 @@ mod random;
 mod true_false_vectors;
 mod approximate_set;
 mod statistics;
-mod vector_pool;
 
 pub use moving_average::{EMA, ExponentialMovingAverage};
 pub use random::RandomGenerator;

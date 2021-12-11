@@ -2,7 +2,7 @@
 
 ###  `LocalSearch::import`
 
-The `Extension` part of the `LocalSearch::import` is broken, because `extract_pb()` as currently designed requires two mutable borrows of `self`. It's a weird design, anyway, because it is a function that takes two closures. 
+The `Extension` part of the `LocalSearch::import` is broken, because `extract_pb()` as currently designed requires two mutable borrows of `self`. It's a weird design, anyway, because it is a function that takes two closures.
 
 ### Hierarchical inheritance: `Solver` is a `solver_core`, `local_search` is a `LocalSearchCore`
 
@@ -12,7 +12,7 @@ The `Extension` part of the `LocalSearch::import` is broken, because `extract_pb
 ## Symbols & Parameters
 
 | Module          | Type                     | Description                                                                   |
-|:----------------|:-------------------------|:------------------------------------------------------------------------------|
+| :-------------- | :----------------------- | :---------------------------------------------------------------------------- |
 | parameters.rs   | `Parameters`             | Metadata and `HashMap<&'s str, Parameter<'s>>`                                |
 | parameters.rs   | `Parameter`              | Name, description, and `ParameterValue<'s>`                                   |
 | parameters.rs   | `ParameterValue`         | Enum wrapper for `u64`, `f64`, `bool`, `&str` called `ParameterValue::Symbol` |
@@ -36,7 +36,7 @@ The `Extension` part of the `LocalSearch::import` is broken, because `extract_pb
 ### Singular
 
 | Name         | Values                                  | Repr      |
-|:-------------|:----------------------------------------|:----------|
+| :----------- | :-------------------------------------- | :-------- |
 | `bool`       | `true`<br>`false`                       | primitive |
 | `LiftedBool` | `False=-1`<br>`True=1`<br>`Undefined=0` | Enum      |
 | `Theory`     | ??                                      | `i32`     |
@@ -44,7 +44,7 @@ The `Extension` part of the `LocalSearch::import` is broken, because `extract_pb
 ### Meta Variables
 
 | Name            | Values            | Repr                     | Description                                 |
-|:----------------|:------------------|:-------------------------|:--------------------------------------------|
+| :-------------- | :---------------- | :----------------------- | :------------------------------------------ |
 | `BoolVariable`  | any `u32` value   | `u32`                    | An identifier of a variable in the program. |
 | `Literal`       | any `u32` value   | `Literal(BoolVariable)`  | `BoolVariable` & value                      |
 | `DimacsLiteral` | Same as `Literal` | `DimacsLiteral(Literal)` | Newtype of `Literal`                        |
@@ -53,7 +53,7 @@ The `Extension` part of the `LocalSearch::import` is broken, because `extract_pb
 
 
 | Name              | Values       | Repr  |                                                      |
-|:------------------|:-------------|:------|:-----------------------------------------------------|
+| :---------------- | :----------- | :---- | :--------------------------------------------------- |
 | `LiteralVector`   | ??           | `Vec` |                                                      |
 | `Vec<LiftedBool>` | `LiftedBool` | `Vec` | assignment from `BoolVariable` index to `LiftedBool` |
 | `Model`           | `LiftedBool` | `Vec` | Holds a `Vec<LiftedBool>`                            |
@@ -71,7 +71,7 @@ compile time. In contrast, we read in the parameter database from a JSON file at
 # Dictionary of terms
 
 | z3                      | zsat                         |
-|:------------------------|:-----------------------------|
+| :---------------------- | :--------------------------- |
 | `lbool`                 | `LiftedBool`                 |
 | `default_exception`     | `errors::Error`              |
 | `sat_param_exception`   | `errors::Error`              |
@@ -79,9 +79,9 @@ compile time. In contrast, we read in the parameter database from a JSON file at
 | `bool_var`              | `BoolVariable`               |
 | `bool_var_vector`       | `BoolVariableVector`         |
 | `ext_constraint_idx`    | `ExternalConstraintIndex`    |
-| `ext_justification_idx` | `ExternalJustificationIndex` |
+| `ext_justification_idx`  | `ExternalJustificationIndex`  |
 | `literal_approx_set`    | `LiteralApproximateSet`      |
 | `var_approx_set`        | `VariableApproximateSet`     |
 | `negate`                | `negate_literals`            |
-| `mus`                   | `MinimalUnsatisfiableSet`    |
-|                         |                              |
+| `mus`                   | `MinimalUnsatisfiableSet`     |
+| `SASSERT`               | `log_assert!`                |

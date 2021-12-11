@@ -15,7 +15,10 @@ pub enum Error {
   IncompleteExtension,
 
   #[error("Module has no parameters file or file not found.")]
-  DeserializeParameters,
+  DeserializeParametersFile,
+
+  #[error("An error occurred while deserializing the parameters.")]
+  DeserializeParameterValue,
 
   // todo: Is this a real error or is it an Unknown error?
   #[error("A Default Error occurred.")]

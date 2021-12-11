@@ -163,7 +163,7 @@ pub struct Solver<'s> {
   statistics        : SolverStatistics,
   pub ext           : Option<Box<Extension>>,
   cut_simplifier    : Option<Box<CutSimplifier>>,
-  par               : Parallel,
+  parallel               : Parallel,
   pub drat          : DRAT, // DRAT for generating proofs
   cls_allocator     : ClauseAllocator,
   cls_allocator_idx : bool,
@@ -249,18 +249,18 @@ pub struct Solver<'s> {
   scopes            : Vec<Scope>,
   vars_lim          : ScopedLimitTrail,
   stopwatch         : Stopwatch,
-  pub(crate) params : ParametersRef<'s>,
+  pub(crate) parameters : ParametersRef<'s>,
   clone             : Rc<Solver<'s>>,     // for debugging purposes
   assumptions       : LiteralVector,      // additional assumptions during check
   assumption_set    : LiteralSet,         // set of enabled assumptions
   ext_assumption_set: LiteralSet,         // set of enabled assumptions
   core              : LiteralVector,      // unsat core
 
-  pub(crate) par_id  : u32,
-  par_limit_in       : u32,
-  par_limit_out      : u32,
+  pub(crate) parallel_id  : u32,
+  parallel_limit_in       : u32,
+  parallel_limit_out      : u32,
   par_num_vars       : u32,
-  pub par_syncing_clauses: bool,
+  pub parallel_syncing_clauses: bool,
 
   cuber         : Box<Cuber>,
   local_search  : Option<Box<dyn LocalSearchCore>>,
@@ -526,15 +526,15 @@ impl Default<'s> for Solver<'s> {
 impl<'s> Solver<'s> {
 
 
-/*
-  pub fn from_params_limit(params: ParametersRef, resource_limit: &ResourceLimit) -> Self{
+
+  pub fn from_params_limit(params: ParametersRef, resource_limit: ArcRwResourceLimit) -> Self{
     Self{
-      params,
+      parameters: params,
       resource_limit: resource_limit.clone(),
       ..Self::default
     }
   }
-*/
+
 
   pub fn get_config(&self) -> &Config {
     &self.config
@@ -561,5 +561,14 @@ impl<'s> Solver<'s> {
       cut_simplifier.collect_statistics(st);
     }
     st.extend(&self.aux_statistics);
+  }
+
+  fn set_parallel(&mut self, parallel: &Parallel, parallel_id: usize) {
+      self.parallel = parallel;
+      self.parallel_num_vars = self.number_of_variables();
+      self.parallel_limit_in = 0;
+      self.parallel_limit_out = 0;
+      self.parallel_id = parallel_id;
+      self.parallel_syncing_clauses = false;
   }
 }

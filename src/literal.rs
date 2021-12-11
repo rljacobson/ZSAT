@@ -38,7 +38,7 @@ impl Literal {
   pub(crate) const NULL: Self = Literal(NULL_BOOL_VAR << 1);
   pub(crate) const ZERO: Self = Literal(0);
 
-  pub const fn new(v: BoolVariable, sign: bool) -> Literal {
+  pub fn new(v: BoolVariable, sign: bool) -> Literal {
     if sign {
       Literal((v << 1) + 1)
     } else {

@@ -1,5 +1,5 @@
 /*!
-  
+
   Checking satisfiability results in information like
 
    * The result (`LiftedBool`)
@@ -9,12 +9,12 @@
 
   and so on. The `SatisfiabilityCheckResult` trait is implemented for the struct that manages this
   information.
-  
+
 */
 
 use std::rc::Rc;
 
-use crate::{LiftedBool, Model};
+use crate::{LiftedBool, Model, Statistics};
 use crate::symbol_table::SymbolData;
 use crate::missing_types::*;
 
