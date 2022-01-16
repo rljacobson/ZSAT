@@ -18,8 +18,12 @@ represented with a `Literal`.
 
 use std::fmt::{Display, Formatter};
 
-use crate::{BoolVariable, NULL_BOOL_VAR, UIntSet};
-use crate::data_structures::OredIntegerSet;
+use crate::{
+  data_structures::OredIntegerSet,
+  BoolVariable,
+  NULL_BOOL_VAR,
+  UIntSet
+};
 
 pub type LiteralVector = Vec<Literal>;
 pub type LiteralApproximateSet = OredIntegerSet<usize, Literal>;
@@ -138,4 +142,9 @@ pub fn negate_literals(literals: &mut LiteralVector) {
   for literal in literals {
     literal.negate();
   }
+}
+
+/// Returns a string of the elements of the vector separated by spaces.
+pub fn display_literal_vector(literals: &LiteralVector) -> String {
+  literals.join(" ")
 }

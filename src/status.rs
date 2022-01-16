@@ -24,7 +24,7 @@ impl Status {
   pub fn asserted() -> Status {
     Status::Asserted(-1)
   }
-  pub fn redundent() -> Status {
+  pub fn redundant() -> Status {
     Status::Redundant(-1)
   }
   pub fn repeated() -> Status {

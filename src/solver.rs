@@ -14,7 +14,7 @@ use crate::{
   BoolVariableVector,
   clause::{
     ClauseWrapperVector,
-    ClauseVector,
+    ClauseVector, Clause,
   },
   config::Config,
   data_structures::{
@@ -60,11 +60,12 @@ use crate::{
   parameters::ParametersRef,
   ResourceLimit,
   status::Status,
-  watched::WatchList,
+  watched::WatchList, LiftedBool, log::trace,
 };
 use crate::missing_types::MinimalUnsatisfiableSet;
 use crate::resource_limit::ArcRwResourceLimit;
 
+const ENABLE_TERNARY: bool = true;
 
 type LevelApproximateSet = OredIntegerSet<u32, u32>;
 type IndexSet = HashSet<u32>;
@@ -163,7 +164,7 @@ pub struct Solver<'s> {
   statistics        : SolverStatistics,
   pub ext           : Option<Box<Extension>>,
   cut_simplifier    : Option<Box<CutSimplifier>>,
-  parallel               : Parallel,
+  parallel          : Option<Box<Parallel>>,
   pub drat          : DRAT, // DRAT for generating proofs
   cls_allocator     : ClauseAllocator,
   cls_allocator_idx : bool,
@@ -198,7 +199,7 @@ pub struct Solver<'s> {
   decision        : Vec<bool>,
   mark            : Vec<bool>,
   lit_mark        : Vec<bool>,
-  eliminated      : Vec<bool>,
+  pub eliminated  : Vec<bool>,
   external        : Vec<bool>,
   var_scope       : Vec<u32>,
   touched         : Vec<u32>,
@@ -233,8 +234,8 @@ pub struct Solver<'s> {
   reorder_inc           : u32,
   case_split_queue      : VariableQueue,
   qhead                 : u32,
-  scope_lvl             : u32,
-  search_lvl            : u32,
+  scope_level           : u32,
+  search_level          : u32,
   fast_glue_avg         : ExponentialMovingAverage,
   slow_glue_avg         : ExponentialMovingAverage,
   fast_glue_backup      : ExponentialMovingAverage,
@@ -256,10 +257,10 @@ pub struct Solver<'s> {
   ext_assumption_set: LiteralSet,         // set of enabled assumptions
   core              : LiteralVector,      // unsat core
 
-  pub(crate) parallel_id  : u32,
-  parallel_limit_in       : u32,
-  parallel_limit_out      : u32,
-  par_num_vars       : u32,
+  pub(crate) parallel_id      : u32,
+      parallel_limit_in       : u32,
+      parallel_limit_out      : u32,
+  pub parallel_variable_count : u32,
   pub parallel_syncing_clauses: bool,
 
   cuber         : Box<Cuber>,
@@ -564,11 +565,186 @@ impl<'s> Solver<'s> {
   }
 
   fn set_parallel(&mut self, parallel: &Parallel, parallel_id: usize) {
-      self.parallel = parallel;
-      self.parallel_num_vars = self.number_of_variables();
-      self.parallel_limit_in = 0;
-      self.parallel_limit_out = 0;
-      self.parallel_id = parallel_id;
+      self.parallel                 = parallel;
+      self.parallel_variable_count  = self.number_of_variables();
+      self.parallel_limit_in        = 0;
+      self.parallel_limit_out       = 0;
+      self.parallel_id              = parallel_id;
       self.parallel_syncing_clauses = false;
   }
+
+  pub fn mk_clause_core(&mut self, literals: &LiteralVector, status: Status) -> Option<Box<Clause>> {
+    let redundant = status.is_redundant();
+    let literal_count = literals.len();
+
+    trace!(
+      "sat",
+      format!(
+        "mk_clause: {} {}\n",
+        display_literal_vector(literals),
+        if redundant {
+          "learned"
+        } else {
+          "aux"
+        }
+      )
+    );
+
+    if !redundant || !status.is_satisfied() {
+      let old_sz        = literals.len();
+      let keep          = self.simplify_clause(literals);
+
+      trace!(
+        "sat_mk_clause",
+        format!(
+          "mk_clause (after simp), keep: {}\n{}\n",
+          keep,
+          display_literal_vector(literals)
+        )
+      );
+
+      if !keep {
+        return None; // Clause is equivalent to true.
+      }
+
+      // If an input clause is simplified, then log the simplified version as learned
+      if self.config.drat && old_sz > literal_count {
+        self.drat.add(literals, status);
+        // drat_log_clause(literals, status);
+      }
+
+      self.statistics.non_learned_generation += 1;
+
+      if !self.searching {
+        self.mc.add_clause(literals);
+      }
+    }
+
+    match literal_count {
+
+      0 => {
+        self.set_conflict();
+        return None;
+      }
+
+      1 => {
+        if self.config.drat && (!status.is_satisfied() || status.is_input()) {
+          // drat_log_clause(literals, status);
+          self.drat.add(literals, status);
+        }
+        self.assign_unit(literals[0]);
+
+        return None;
+      }
+
+      2 => {
+        self.mk_bin_clause(literals[0], literals[1], status);
+        if redundant {
+          if let Some(parallel) = self.parallel {
+            parallel.share_literals(self, literals[0], literals[1]);
+          }
+        }
+        return None;
+      }
+
+      3 => {
+        if ENABLE_TERNARY {
+          return self.mk_ter_clause(literals, status);
+        }
+        return self.mk_nary_clause(literals, status);
+      }
+
+      _ => {
+        return self.mk_nary_clause(literals, status);
+      }
+
+    }
+  }
+
+  fn assign(&mut self, literal: Literal, justification: Justification) {
+
+    trace!("sat_assign", "{} previous value: {} j: {}\n", literal,  self.value(l), justification);
+
+    match self.value(literal) {
+      LiftedBool::False     => self.set_conflict(justification, !literal),
+      LiftedBool::Undefined => self.assign_core(literal,justification),
+      LiftedBool::True      => self.update_assign(literal, justification)
+    };
+  }
+
+  fn update_assign(&mut self, literal: Literal, justification: Justification) {
+    if justification.level() == 0 {
+      self.justification[literal.var()] = justification;
+    }
+  }
+
+  fn assign_unit(&mut self, literal: Literal) {
+    self.assign(literal, Justification::with_level(0))
+  }
+
+
+
+  /// Returns the `self.assignment` of the given `Literals`.
+  fn get_literal_value(&self, literal: Literal) -> LiftedBool {
+    self.assignment[literal.index()]
+  }
+
+  fn get_literal_level(&self, literal: Literal) -> u32 {
+    self.justification[literal.var()].level()
+  }
+
+  // The template bool allows for compile-time optimization based on the value of `lvl0`.
+  fn simplify_clause_core<const LEVEL_ZERO: bool>(&self, literals: &mut LiteralVector) -> bool {
+    literals.sort_unstable();
+    let previous_literal = Literal::NULL;
+    let j = 0u32;
+
+    for i in 0.. literals.len() {
+      let current_literal = literals[i];
+      let value: LiftedBool = self.get_literal_value(current_literal);
+
+      if !LEVEL_ZERO && self.get_literal_level(current_literal) > 0 {
+        value = LiftedBool::Undefined;
+      }
+
+      match value {
+
+        LiftedBool::False => { /*  Ignore this literal */ },
+
+        LiftedBool::Undefined => {
+          if current_literal == !previous_literal {
+              return false; // Clause is equivalent to true
+            }
+          if current_literal != previous_literal {
+              previous_literal = current_literal;
+              if i != j {
+                  std::mem::swap(literals[j], literals[i]);
+                }
+              j += 1;
+          }
+        }
+
+        LiftedBool::True => {
+          return false; // Clause is equivalent to true
+        }
+
+      }
+    }
+    // num_lits = j;
+    true
+  }
+
+  fn at_base_level(&self) -> bool {
+    self.scope_level == 0
+  }
+
+  fn simplify_clause(&self, literals: &mut LiteralVector) -> bool {
+        if self.at_base_level(){
+          return self.simplify_clause_core::<true>(literals);
+        }
+        else {
+          return self.simplify_clause_core::<false>(literals);
+        }
+    }
+
 }
